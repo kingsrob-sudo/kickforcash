@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.4</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.5</div>
     </div>
   </div>
 
@@ -1078,10 +1078,18 @@
         if (d < ballR + t.radius) {
           t.alive = false;
           t.hitAnim = 1;
-          score += 100;
           ball.hitTarget = true;
+
+          // Distance-based scoring: how close to the target center?
+          // d=0 means dead center, d=t.radius means edge
+          // Normalize: 0 = center, 1 = edge of target
+          const accuracy = Math.min(d / t.radius, 1);
+          // 100 points at center, 30 at edge, linear interpolation
+          const points = Math.round(100 - accuracy * 70);
+
+          score += points;
           spawnParticles(t.x, t.y);
-          spawnScorePopup(t.x, t.y - 30, 100);
+          spawnScorePopup(t.x, t.y - 30, points);
 
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
