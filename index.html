@@ -585,6 +585,11 @@
     function updateBall() {
       if (!ball.flying) return;
 
+      // The back wall of the net — ball hits this before reaching the ground
+      // Sits about 70% of the way from crossbar to horizon (like 10ft behind the goal line)
+      const netWallY = goal.y + goal.height * 0.7;
+      // In screen terms, this is a vertical wall at that Y depth
+
       if (ball.phase === 'arc') {
         // ── ARC PHASE: parametric parabola from player to horizon ──
         ball.flightT += ball.flightSpeed;
@@ -596,7 +601,6 @@
         const linearY = ball.startY + (ball.targetY - ball.startY) * t;
 
         // Spin curves the ball sideways — peaks in the middle of flight
-        // Uses sin curve so it bends smoothly: 0 at start, max at middle, settles at end
         const spinOffset = ball.spin * Math.sin(t * Math.PI) * 60;
 
         ball.groundX = linearX + spinOffset;
@@ -621,13 +625,25 @@
         // Check collisions during flight
         checkTargetCollisions();
 
-        // Arc complete — transition to bounce
-        if (ball.flightT >= 1.0) {
+        // ── NET WALL CHECK: ball hit the back of the net? ──
+        if (ball.groundY <= netWallY && ball.ballHeight > 0) {
+          // Ball has reached the back of the net while still airborne
           ball.phase = 'bounce';
-          // Initial bounce velocity: carry some upward energy
-          ball.bounceVY = -4; // upward kick for first bounce
-          ball.bounceVX = (ball.targetX - ball.startX) * 0.003; // tiny horizontal drift
+          // Bounce off the vertical net wall — reverse the "depth" velocity
+          // and give a small downward + forward bounce
+          ball.bounceVY = 2; // slight downward push
+          ball.bounceVX = ball.spin * 0.4; // spin carries sideways
+          ball.bounceGroundY = ball.groundY; // freeze depth at net wall
+          // Ball keeps its current height — it bounces off the wall, not the floor
+        }
+
+        // Arc complete without hitting net (weak kick that drops early)
+        if (ball.flightT >= 1.0 && ball.phase === 'arc') {
+          ball.phase = 'bounce';
+          ball.bounceVY = -2;
+          ball.bounceVX = (ball.targetX - ball.startX) * 0.002;
           ball.ballHeight = 0;
+          ball.bounceGroundY = ball.groundY;
         }
 
         // Ball went off screen sideways
@@ -638,21 +654,20 @@
         }
 
       } else if (ball.phase === 'bounce') {
-        // ── BOUNCE PHASE: gravity-driven bounces at the horizon line ──
+        // ── BOUNCE PHASE: ball hit the net wall, now bouncing down ──
         const gravity = 0.35;
 
         ball.bounceVY += gravity;
         ball.ballHeight -= ball.bounceVY;
-        ball.groundX += ball.bounceVX + ball.spin * 0.3; // spin carries into bounce drift
-        ball.rotation += ball.rotationSpeed * 0.5; // slow down rotation
+        ball.groundX += ball.bounceVX;
+        ball.rotation += ball.rotationSpeed * 0.5;
 
-        // Hit the ground plane
+        // Ball drops to the net floor (the ground Y where it's bouncing)
         if (ball.ballHeight <= 0) {
           ball.ballHeight = 0;
           ball.bounceCount++;
 
           if (ball.bounceCount >= 3) {
-            // Done bouncing — despawn
             ball.phase = 'done';
             setTimeout(resetBall, 150);
             ball.flying = false;
@@ -660,11 +675,11 @@
           }
 
           // Bounce back up with diminishing energy
-          ball.bounceVY = ball.bounceVY * -0.45;
-          ball.bounceVX *= 0.7;
+          ball.bounceVY = ball.bounceVY * -0.4;
+          ball.bounceVX *= 0.6;
         }
 
-        // Screen position
+        // Screen position — stays at the net wall depth
         ball.x = ball.groundX;
         ball.y = ball.bounceGroundY - ball.ballHeight;
 
