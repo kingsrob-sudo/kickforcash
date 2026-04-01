@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.7</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.8</div>
     </div>
   </div>
 
@@ -555,6 +555,7 @@
       startY: 0,
       targetX: 0,
       targetY: 0,
+      visibleHorizonY: 0, // used for perspective shrink only
       flightT: 0,
       flightSpeed: 0,
       arcHeight: 0,
@@ -794,18 +795,15 @@
     }
 
     function fireKick(dx, dy, swipeLength, spinDeviation) {
-      // Power from swipe length — very responsive, easy to reach full power
-      // Even a quick flick (~30px) gets decent power, moderate swipe = full power
-      // Power can exceed 1.0 for hard swipes to allow overkicking
+      // Power from swipe length
       const power = Math.min(swipeLength / 80, 1.5);
 
-      // Direction from the start→end vector angle
       const angle = Math.atan2(dy, dx);
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
-      const horizonY = goal.y + goal.height;
+      const horizonY = goal.y + goal.height; // visible goal bottom (~448)
+      const extendedTargetY = horizonY - 400;  // flight path extends 400 units further back
 
-      // Spin from deviation — OPPOSITE direction
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
       ball.startX = ball.homeX;
@@ -813,10 +811,11 @@
       ball.groundX = ball.homeX;
       ball.groundY = ball.homeY;
       ball.targetX = clampedX;
-      ball.targetY = horizonY;
+      ball.targetY = extendedTargetY;   // ball aims much further back
+      ball.visibleHorizonY = horizonY;  // used for perspective shrink only
       ball.flightT = 0;
-      ball.flightSpeed = (0.008 + power * 0.01) * 0.5; // much slower flight
-      ball.arcHeight = 100 + power * 180;
+      ball.flightSpeed = (0.012 + power * 0.016) * 0.5; // bumped up to compensate for longer path
+      ball.arcHeight = 120 + power * 200; // higher arc for longer flight
       ball.ballHeight = 0;
       ball.flying = true;
       ball.visualScale = ball.restingScale;
@@ -827,7 +826,7 @@
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
-      ball.bounceGroundY = horizonY;
+      ball.bounceGroundY = horizonY; // bounces still happen at the visible ground
     }
 
     // ============================================================
@@ -944,8 +943,8 @@
         ball.x = ball.groundX;
         ball.y = ball.groundY - ball.ballHeight;
 
-        // Perspective shrink with ease-out: 2.0 at player → ~0.45 at goal
-        const depthProgress = Math.max(0, Math.min(1, (ball.homeY - ball.groundY) / (ball.homeY - ball.bounceGroundY)));
+        // Perspective shrink based on visible goal depth, not extended flight target
+        const depthProgress = Math.max(0, Math.min(1, (ball.homeY - ball.groundY) / (ball.homeY - ball.visibleHorizonY)));
         const easedDepth = 1 - Math.pow(1 - depthProgress, 2.5);
         const farScale = 0.45;
         ball.visualScale = ball.restingScale - easedDepth * (ball.restingScale - farScale);
