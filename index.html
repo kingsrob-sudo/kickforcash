@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Georgia Lottery Soccer Kick</title>
+  <title>Georgia Lottery - Kick to Score</title>
   <style>
     * {
       margin: 0;
@@ -33,18 +33,22 @@
       transform: translate(-50%, -50%);
     }
 
-    /* Start Screen Overlay */
+    /* Start Screen Overlay (shown after registration) */
     #startScreen {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       z-index: 100;
       transition: opacity 0.4s ease;
+    }
+
+    #startScreen.active {
+      display: flex;
     }
 
     #startScreen.hidden {
@@ -61,18 +65,34 @@
       margin-bottom: 0.5rem;
     }
 
+    .reg-logo {
+      width: 80%;
+      max-width: 280px;
+      height: auto;
+      margin: 0 auto 1rem;
+      display: block;
+    }
+
     .start-title {
-      font-size: 2.5rem;
+      font-size: 2.8rem;
       font-weight: 900;
       color: #fff;
       text-align: center;
-      line-height: 1.1;
+      line-height: 1.05;
       margin-bottom: 0.5rem;
       text-transform: uppercase;
     }
 
-    .start-title span {
+    .start-title em {
+      font-style: normal;
       color: #48A943;
+    }
+
+    .start-title span {
+      color: #FFB27A;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 3px;
     }
 
     .start-subtitle {
@@ -99,6 +119,13 @@
 
     .start-btn:active {
       transform: scale(0.95);
+    }
+
+    .start-btn:disabled {
+      background: #666;
+      color: #999;
+      cursor: not-allowed;
+      box-shadow: none;
     }
 
     .start-hint {
@@ -173,20 +200,244 @@
     .end-btn:active {
       transform: scale(0.95);
     }
+
+    /* Screen management */
+    .screen {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* Registration Screen */
+    #registerScreen {
+      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
+      padding: 2rem 1.5rem;
+      overflow-y: auto;
+    }
+
+    .reg-content {
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .reg-subtitle {
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 2rem;
+    }
+
+    .reg-input {
+      width: 100%;
+      padding: 1rem 1rem 1rem 3rem;
+      font-size: 1.1rem;
+      border: 2px solid #FFB27A;
+      border-radius: 10px;
+      background: rgba(255, 178, 122, 0.1);
+      color: #fff;
+      margin-bottom: 1rem;
+      text-align: left;
+      background-repeat: no-repeat;
+      background-position: 0.8rem center;
+      background-size: 1.2rem;
+    }
+
+    .reg-input.email-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFB27A' stroke-width='2'%3E%3Cpath d='M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'/%3E%3Cpath d='M22 6l-10 7L2 6'/%3E%3C/svg%3E");
+    }
+
+    .reg-input.phone-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFB27A' stroke-width='2'%3E%3Cpath d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z'/%3E%3C/svg%3E");
+    }
+
+    .reg-input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .reg-input:focus {
+      outline: none;
+      background-color: rgba(255, 178, 122, 0.15);
+      border-color: #FFB27A;
+    }
+
+    .checkbox-group {
+      text-align: left;
+      margin-bottom: 2rem;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+      cursor: pointer;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      margin-right: 12px;
+      cursor: pointer;
+      accent-color: #48A943;
+    }
+
+    .checkbox-item label {
+      font-size: 1rem;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .checkbox-item a {
+      color: #FFB27A;
+      text-decoration: underline;
+    }
+
+    /* Terms Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 200;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: #4D200B;
+      padding: 2rem;
+      border-radius: 15px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 2px solid #FFB27A;
+    }
+
+    .modal-header {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      color: #FFB27A;
+    }
+
+    .modal-body {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+      color: #ddd;
+    }
+
+    .modal-close {
+      width: 100%;
+      padding: 1rem;
+      background: #48A943;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
   <canvas id="gameCanvas"></canvas>
 
-  <!-- Start Screen -->
+  <!-- Registration Screen -->
+  <div id="registerScreen" class="screen active">
+    <div class="reg-content">
+      <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
+      <div class="start-title"><em>Kick</em><br><span>to</span><br><em>Score</em></div>
+      <div class="reg-subtitle">Enter your info to play and win!</div>
+
+      <input 
+        type="email" 
+        id="emailInput" 
+        class="reg-input email-icon" 
+        placeholder="Enter your email address"
+        required
+      >
+      
+      <input 
+        type="tel" 
+        id="phoneInput" 
+        class="reg-input phone-icon" 
+        placeholder="Enter your phone number"
+        required
+      >
+
+      <div class="checkbox-group">
+        <div class="checkbox-item">
+          <input type="checkbox" id="ageCheck">
+          <label for="ageCheck">I am 18 years or older</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="termsCheck">
+          <label for="termsCheck">
+            I agree to the <a href="#" id="termsLink">Terms and Conditions</a>
+          </label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="marketingCheck">
+          <label for="marketingCheck">I consent to receive Marketing from the GLC</label>
+        </div>
+      </div>
+
+      <button class="start-btn" id="continueBtn">Continue</button>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.8</div>
+    </div>
+  </div>
+
+  <!-- Terms Modal -->
+  <div id="termsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Terms and Conditions</div>
+      <div class="modal-body">
+        <p><strong>Georgia Lottery Soccer Kick Game - Official Rules</strong></p>
+        <br>
+        <p><strong>1. Eligibility:</strong> Participants must be 18 years of age or older. Employees of the Georgia Lottery Corporation and their immediate family members are not eligible to participate.</p>
+        <br>
+        <p><strong>2. How to Play:</strong> Scan the QR code, enter your email address and phone number, then play the Soccer Kick game. Swipe to kick soccer balls at targets within 60 seconds.</p>
+        <br>
+        <p><strong>3. Prize Drawing:</strong> All participants who complete the game will be entered into the prize drawing. Winners will be selected and notified via the contact information provided.</p>
+        <br>
+        <p><strong>4. Privacy:</strong> Contact information will be used for prize notification and Georgia Lottery communications. By participating, you consent to receive marketing communications from the Georgia Lottery Corporation.</p>
+        <br>
+        <p><strong>5. Limitations:</strong> One entry per person. Multiple entries from the same email address or phone number will be disqualified. Prizes are non-transferable and have no cash value.</p>
+        <br>
+        <p><strong>6. Liability:</strong> The Georgia Lottery Corporation is not responsible for technical malfunctions, network connectivity issues, or any other factors beyond our control that may affect participation.</p>
+        <br>
+        <p><strong>7. Acceptance:</strong> By participating, you agree to be bound by these official rules and the decisions of the Georgia Lottery Corporation, which are final and binding.</p>
+      </div>
+      <button class="modal-close" id="closeTermsBtn">Close</button>
+    </div>
+  </div>
+
+  <!-- Start Screen (post-registration) -->
   <div id="startScreen">
-    <div class="start-logo">Georgia Lottery</div>
-    <div class="start-title">Soccer<br><span>Kick</span></div>
+    <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
+    <div class="start-title"><em>Kick</em><br><span>to</span><br><em>Score</em></div>
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
-    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.5</div>
   </div>
 
   <!-- End Screen -->
@@ -615,6 +866,7 @@
       // Start background video (needs user interaction trigger on mobile)
       bgVideo.play().catch(e => console.log('Video autoplay blocked:', e));
 
+      document.getElementById('startScreen').classList.remove('active');
       document.getElementById('startScreen').classList.add('hidden');
       document.getElementById('endScreen').classList.remove('active');
 
@@ -1303,6 +1555,56 @@
       draw();
       requestAnimationFrame(loop);
     }
+
+    // ============================================================
+    // REGISTRATION
+    // ============================================================
+    let userEmail = '';
+    let userPhone = '';
+    let userMarketingConsent = false;
+
+    const emailInput = document.getElementById('emailInput');
+    const phoneInput = document.getElementById('phoneInput');
+    const ageCheck = document.getElementById('ageCheck');
+    const termsCheck = document.getElementById('termsCheck');
+    const marketingCheck = document.getElementById('marketingCheck');
+    const continueBtn = document.getElementById('continueBtn');
+
+    // Validation disabled for testing — continue always enabled
+    // TODO: re-enable validation before production
+    function validateRegistration() {
+      // const emailValid = emailInput.value.includes('@') && emailInput.value.includes('.');
+      // const phoneValid = phoneInput.value.replace(/\D/g, '').length >= 10;
+      // const allChecked = ageCheck.checked && termsCheck.checked;
+      // continueBtn.disabled = !(emailValid && phoneValid && allChecked);
+    }
+
+    emailInput.addEventListener('input', validateRegistration);
+    phoneInput.addEventListener('input', validateRegistration);
+    ageCheck.addEventListener('change', validateRegistration);
+    termsCheck.addEventListener('change', validateRegistration);
+    marketingCheck.addEventListener('change', validateRegistration);
+
+    // Terms modal
+    document.getElementById('termsLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('termsModal').classList.add('active');
+    });
+
+    document.getElementById('closeTermsBtn').addEventListener('click', () => {
+      document.getElementById('termsModal').classList.remove('active');
+    });
+
+    // Continue from registration to game start screen
+    continueBtn.addEventListener('click', () => {
+      userEmail = emailInput.value.trim();
+      userPhone = phoneInput.value.trim();
+      userMarketingConsent = marketingCheck.checked;
+
+      // Hide registration, show start screen
+      document.getElementById('registerScreen').classList.remove('active');
+      document.getElementById('startScreen').classList.add('active');
+    });
 
     // ============================================================
     // BUTTON HANDLERS
