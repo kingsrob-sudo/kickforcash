@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.8</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.0</div>
     </div>
   </div>
 
@@ -814,8 +814,8 @@
       ball.targetY = extendedTargetY;   // ball aims much further back
       ball.visibleHorizonY = horizonY;  // used for perspective shrink only
       ball.flightT = 0;
-      ball.flightSpeed = (0.012 + power * 0.016) * 0.5; // bumped up to compensate for longer path
-      ball.arcHeight = 120 + power * 200; // higher arc for longer flight
+      ball.flightSpeed = (0.005 + power * 0.007) * 0.5;
+      ball.arcHeight = 250 + power * 300; // big arc — ball needs to visibly rise and fall
       ball.ballHeight = 0;
       ball.flying = true;
       ball.visualScale = ball.restingScale;
@@ -913,18 +913,15 @@
 
       if (ball.phase === 'arc') {
         // ── ARC PHASE: parametric parabola from player to horizon ──
-        // Decelerate: ball advances quickly at start, slows as it travels
-        const decel = 1 - ball.flightT * 0.6; // speed drops to 40% by end of flight
-        ball.flightT += ball.flightSpeed * Math.max(decel, 0.3);
+        // Decelerate: ball slows as it travels further
+        const decel = 1 - ball.flightT * 0.5;
+        ball.flightT += ball.flightSpeed * Math.max(decel, 0.35);
 
         const t = Math.min(ball.flightT, 1.0);
 
-        // Ease-out on ground position so ball visually decelerates in both X and Y
-        const easedT = 1 - Math.pow(1 - t, 1.8);
-
-        // Ground position: eased interpolation + spin curve offset
-        const linearX = ball.startX + (ball.targetX - ball.startX) * easedT;
-        const linearY = ball.startY + (ball.targetY - ball.startY) * easedT;
+        // Ground position: linear with t (no ease-out, let decel handle slowing)
+        const linearX = ball.startX + (ball.targetX - ball.startX) * t;
+        const linearY = ball.startY + (ball.targetY - ball.startY) * t;
 
         // Spin curves the ball sideways — bends MORE toward the end of flight
         // t^3 means: barely any curve early, dramatic bend late (banana kick feel)
