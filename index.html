@@ -186,7 +186,7 @@
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
-    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v0.8</div>
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.1</div>
   </div>
 
   <!-- End Screen -->
@@ -237,8 +237,17 @@
     resize();
 
     // ============================================================
-    // BACKGROUND IMAGE
+    // BACKGROUND VIDEO
     // ============================================================
+    const bgVideo = document.createElement('video');
+    bgVideo.src = 'gameplayBG.mp4';
+    bgVideo.loop = true;
+    bgVideo.muted = true;
+    bgVideo.playsInline = true;
+    bgVideo.preload = 'auto';
+    let bgVideoReady = false;
+    bgVideo.addEventListener('canplaythrough', () => { bgVideoReady = true; });
+    // Also keep the static image as fallback
     const bgImage = new Image();
     bgImage.src = 'gameplayBG.jpg';
     let bgLoaded = false;
@@ -268,6 +277,9 @@
     let timeLeft = 60;
     let timerInterval = null;
 
+    // Dead balls — balls that finished bouncing but linger in the net
+    let deadBalls = []; // { x, y, visualScale, frame, spawnTime }
+
     // Ball — parabolic 3D-faked flight with bouncing
     // The "ground plane" ends at the horizon line = bottom of goal
     // Ball arcs up, lands at horizon, bounces a few times, then despawns
@@ -275,10 +287,10 @@
     const BALL_RADIUS = 30; // base radius at "normal" size
     const ball = {
       x: GW / 2,          // screen x
-      y: GH - 120,        // screen y
+      y: GH - 125,        // screen y
       radius: BALL_RADIUS,
       homeX: GW / 2,
-      homeY: GH - 120,
+      homeY: GH - 125,
       flying: false,
       visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
       restingScale: 2.6,  // the scale when sitting at home
@@ -588,8 +600,12 @@
       ball.bounceVX = 0;
       particles = [];
       scorePopups = [];
+      deadBalls = [];
       spawnTargets();
       gameState = 'playing';
+
+      // Start background video (needs user interaction trigger on mobile)
+      bgVideo.play().catch(e => console.log('Video autoplay blocked:', e));
 
       document.getElementById('startScreen').classList.add('hidden');
       document.getElementById('endScreen').classList.remove('active');
@@ -676,11 +692,10 @@
         if (ball.groundY <= netWallY && ball.ballHeight > 0) {
           // Ball has reached the back of the net while still airborne
           ball.phase = 'bounce';
-          // Bounce off the vertical net wall — reverse the "depth" velocity
-          // and give a small downward + forward bounce
-          ball.bounceVY = 2; // slight downward push
-          ball.bounceVX = ball.spin * 0.4; // spin carries sideways
-          ball.bounceGroundY = ball.groundY; // freeze depth at net wall
+          // Bounce off the net wall — good initial bounce energy
+          ball.bounceVY = -6; // strong upward bounce off the net
+          ball.bounceVX = ball.spin * 0.5;
+          ball.bounceGroundY = ball.groundY;
           // Ball keeps its current height — it bounces off the wall, not the floor
         }
 
@@ -702,28 +717,35 @@
 
       } else if (ball.phase === 'bounce') {
         // ── BOUNCE PHASE: ball hit the net wall, now bouncing down ──
-        const gravity = 0.35;
+        const gravity = 0.5;
 
         ball.bounceVY += gravity;
         ball.ballHeight -= ball.bounceVY;
         ball.groundX += ball.bounceVX;
         ball.rotation += ball.rotationSpeed * 0.5;
 
-        // Ball drops to the net floor (the ground Y where it's bouncing)
+        // Ball drops to the net floor
         if (ball.ballHeight <= 0) {
           ball.ballHeight = 0;
           ball.bounceCount++;
 
-          if (ball.bounceCount >= 3) {
+          if (ball.bounceCount >= 5) {
+            // Done bouncing — leave a dead ball in the net and reset
+            deadBalls.push({
+              x: ball.groundX,
+              y: ball.bounceGroundY,
+              visualScale: ball.visualScale,
+              frame: ballFrame,
+              spawnTime: Date.now(),
+            });
             ball.phase = 'done';
-            setTimeout(resetBall, 150);
-            ball.flying = false;
+            resetBall();
             return;
           }
 
-          // Bounce back up with diminishing energy
-          ball.bounceVY = ball.bounceVY * -0.4;
-          ball.bounceVX *= 0.6;
+          // Bounce back up — bouncier! (0.55 restitution instead of 0.4)
+          ball.bounceVY = ball.bounceVY * -0.55;
+          ball.bounceVX *= 0.7;
         }
 
         // Screen position — stays at the net wall depth
@@ -787,6 +809,7 @@
 
       drawBackground();
       drawBallShadow();
+      drawDeadBalls();
       drawTargets();
       drawParticles();
       drawBall();
@@ -798,11 +821,13 @@
     }
 
     function drawBackground() {
-      if (bgLoaded) {
-        // Draw the background image scaled to fill the game canvas
+      if (bgVideoReady && !bgVideo.paused) {
+        // Draw the looping video as background
+        ctx.drawImage(bgVideo, 0, 0, GW, GH);
+      } else if (bgLoaded) {
+        // Fallback to static image
         ctx.drawImage(bgImage, 0, 0, GW, GH);
       } else {
-        // Fallback while loading
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
       }
@@ -818,6 +843,38 @@
         ctx.beginPath();
         ctx.ellipse(ball.groundX, ball.groundY, r * 0.9, r * 0.25, 0, 0, Math.PI * 2);
         ctx.fill();
+      }
+    }
+
+    function drawDeadBalls() {
+      if (!ballSheetLoaded) return;
+      const now = Date.now();
+
+      for (const db of deadBalls) {
+        const age = (now - db.spawnTime) / 1000; // seconds
+        // Fade out in the last 2 seconds
+        let alpha = 1.0;
+        if (age > 8) {
+          alpha = 1 - (age - 8) / 2;
+        }
+        if (alpha <= 0) continue;
+
+        const r = BALL_RADIUS * db.visualScale;
+        const spriteScale = 1.5;
+        const drawSize = r * 2 * spriteScale;
+
+        const col = db.frame % SPRITE_COLS;
+        const row = Math.floor(db.frame / SPRITE_COLS);
+        const sx = col * SPRITE_CELL;
+        const sy = row * SPRITE_CELL;
+
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(
+          ballSheet,
+          sx, sy, SPRITE_CELL, SPRITE_CELL,
+          db.x - drawSize / 2, db.y - drawSize / 2, drawSize, drawSize
+        );
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -868,7 +925,7 @@
       const r = ball.radius * ball.visualScale;
       // The sprite ball is ~69% of its cell (88px in 128px), so we scale up
       // to match the intended radius, then 2x larger as requested
-      const spriteScale = 2.0;
+      const spriteScale = 1.5;
       const drawSize = r * 2 * spriteScale;
 
       // Advance sprite frame based on spin speed
@@ -1106,6 +1163,9 @@
         updateBall();
         updateParticles();
         updateScorePopups();
+        // Remove dead balls older than 10 seconds
+        const now = Date.now();
+        deadBalls = deadBalls.filter(db => now - db.spawnTime < 10000);
       }
       draw();
       requestAnimationFrame(loop);
