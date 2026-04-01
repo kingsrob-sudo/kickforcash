@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.8</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.9</div>
     </div>
   </div>
 
@@ -1200,6 +1200,7 @@
       drawBackground();
       drawBallShadow();
       drawDeadBalls();
+      drawDebugGoalBounds();
       drawTargets();
       drawParticles();
       drawBall();
@@ -1212,15 +1213,98 @@
 
     function drawBackground() {
       if (bgVideoReady && !bgVideo.paused) {
-        // Draw the looping video as background
         ctx.drawImage(bgVideo, 0, 0, GW, GH);
       } else if (bgLoaded) {
-        // Fallback to static image
         ctx.drawImage(bgImage, 0, 0, GW, GH);
       } else {
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
       }
+    }
+
+    function drawDebugGoalBounds() {
+      if (gameState !== 'playing') return;
+      ctx.lineWidth = 1.5;
+
+      // Goal outer box (full goal area)
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.strokeRect(goal.x, goal.y, goal.width, goal.height);
+
+      // Label
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText('GOAL BOX', goal.x + 2, goal.y - 3);
+
+      // Left post inner edge
+      const postLeft = goal.x + goal.postWidth;
+      ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(postLeft, goal.y);
+      ctx.lineTo(postLeft, goal.y + goal.height);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
+      ctx.fillText('L POST', postLeft + 2, goal.y + 12);
+
+      // Right post inner edge
+      const postRight = goal.x + goal.width - goal.postWidth;
+      ctx.beginPath();
+      ctx.moveTo(postRight, goal.y);
+      ctx.lineTo(postRight, goal.y + goal.height);
+      ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText('R POST', postRight - 2, goal.y + 12);
+
+      // Crossbar bottom
+      const crossbarBottom = goal.y + goal.postWidth;
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(goal.x, crossbarBottom);
+      ctx.lineTo(goal.x + goal.width, crossbarBottom);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+      ctx.textAlign = 'left';
+      ctx.fillText('CROSSBAR', goal.x + 2, crossbarBottom + 12);
+
+      // Goal bottom (horizon / ground plane)
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(goal.x, goal.y + goal.height);
+      ctx.lineTo(goal.x + goal.width, goal.y + goal.height);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+      ctx.fillText('GROUND PLANE', goal.x + 2, goal.y + goal.height - 3);
+
+      // Net wall (where ball bounces off back of net)
+      const netWallDepthPct = 0.65;
+      const visibleDepth = ball.homeY - ball.visibleHorizonY;
+      // Convert net wall depth to screen Y
+      const netWallScreenY = ball.homeY - visibleDepth * netWallDepthPct;
+      // This is approximate — show it as a reference
+      ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(goal.x, netWallScreenY);
+      ctx.lineTo(goal.x + goal.width, netWallScreenY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255, 0, 255, 0.7)';
+      ctx.fillText('NET WALL (back)', goal.x + 2, netWallScreenY - 3);
+
+      // Side walls inside net (same as posts but labeled differently)
+      ctx.strokeStyle = 'rgba(255, 128, 0, 0.5)';
+      ctx.setLineDash([4, 4]);
+      // Left wall
+      ctx.beginPath();
+      ctx.moveTo(postLeft, goal.y);
+      ctx.lineTo(postLeft, goal.y + goal.height);
+      ctx.stroke();
+      // Right wall
+      ctx.beginPath();
+      ctx.moveTo(postRight, goal.y);
+      ctx.lineTo(postRight, goal.y + goal.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     function drawBallShadow() {
@@ -1252,9 +1336,10 @@
 
       for (const db of deadBalls) {
         const age = (now - db.spawnTime) / 1000;
+        // Visible for 1 second, then fade out over 3 seconds
         let alpha = 1.0;
-        if (age > 8) {
-          alpha = 1 - (age - 8) / 2;
+        if (age > 1) {
+          alpha = 1 - (age - 1) / 3;
         }
         if (alpha <= 0) continue;
 
@@ -1574,7 +1659,7 @@
       if (gameState === 'playing') {
         // Entrance animation — ball rolls up from bottom
         if (ball.entering) {
-          ball.enterT += 0.035;
+          ball.enterT += 0.06; // faster entrance ~1.5s
           if (ball.enterT >= 1) {
             ball.enterT = 1;
             ball.entering = false;
@@ -1597,7 +1682,7 @@
         updateScorePopups();
         // Remove dead balls older than 10 seconds
         const now = Date.now();
-        deadBalls = deadBalls.filter(db => now - db.spawnTime < 10000);
+        deadBalls = deadBalls.filter(db => now - db.spawnTime < 4000);
       }
       draw();
       requestAnimationFrame(loop);
