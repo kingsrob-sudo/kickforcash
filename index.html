@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.1</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.2</div>
     </div>
   </div>
 
@@ -960,14 +960,13 @@
         checkTargetCollisions();
         checkPostCollisions();
 
-        // ── NET WALL: ball reached back of net? ──
-        if (ball.depth >= netWallDepth) {
+        // ── NET WALL: ball reached back of net AND is descending? ──
+        if (ball.depth >= netWallDepth && ball.arcVY > 0) {
           ball.phase = 'bounce';
           ball.bounceVY = -6;
           ball.bounceVX = ball.spin * 0.5 + (Math.random() - 0.5) * 4;
           ball.bounceGroundY = ball.groundScreenY;
-          // Preserve current arc height as bounce height
-          ball.arcY = Math.min(ball.arcY, 0); // make sure it's above ground or at ground
+          ball.arcY = Math.min(ball.arcY, 0);
         }
 
         // ── BALL HIT THE GROUND (arcY >= 0 means at or below ground level) ──
@@ -1085,6 +1084,13 @@
       const postRight = goal.x + goal.width - goal.postWidth;
       const crossbarBottom = goal.y + goal.postWidth;
       const goalBottom = goal.y + goal.height;
+      const visibleDepth = ball.homeY - ball.visibleHorizonY;
+
+      // During flight, only check posts when ball is deep enough and descending
+      if (ball.phase === 'flight') {
+        if (ball.depth < visibleDepth * 0.5) return;
+        if (ball.arcVY < 0) return; // still rising
+      }
 
       if (ball.y > crossbarBottom - ballR && ball.y < goalBottom + ballR) {
 
@@ -1126,7 +1132,7 @@
       // ── CROSSBAR ──
       if (ball.y - ballR < crossbarBottom && ball.y + ballR > goal.y &&
           ball.x > postLeft && ball.x < postRight) {
-        if (ball.phase === 'flight' && ball.arcY < 0) {
+        if (ball.phase === 'flight' && ball.arcVY > 0 && ball.depth > visibleDepth * 0.5) {
           ball.phase = 'bounce';
           ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
           ball.bounceVY = 3;
