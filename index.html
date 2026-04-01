@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.8</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.9</div>
     </div>
   </div>
 
@@ -1595,22 +1595,27 @@
       document.getElementById('termsModal').classList.remove('active');
     });
 
-    // Continue from registration to game start screen
+    // Continue from registration — go straight to gameplay
     continueBtn.addEventListener('click', () => {
       userEmail = emailInput.value.trim();
       userPhone = phoneInput.value.trim();
       userMarketingConsent = marketingCheck.checked;
 
-      // Hide registration, show start screen
+      // Hide registration, skip play screen, go straight to game
       document.getElementById('registerScreen').classList.remove('active');
-      document.getElementById('startScreen').classList.add('active');
+      startGame();
     });
 
     // ============================================================
     // BUTTON HANDLERS
     // ============================================================
     document.getElementById('startBtn').addEventListener('click', startGame);
-    document.getElementById('replayBtn').addEventListener('click', startGame);
+    // Play Again from end screen — show the play button screen (already registered)
+    document.getElementById('replayBtn').addEventListener('click', () => {
+      document.getElementById('endScreen').classList.remove('active');
+      document.getElementById('startScreen').classList.add('active');
+      document.getElementById('startScreen').classList.remove('hidden');
+    });
 
     // Start render loop
     spawnTargets();
