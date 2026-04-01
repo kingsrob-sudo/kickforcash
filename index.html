@@ -263,8 +263,8 @@
       homeX: GW / 2,
       homeY: GH - 120,
       flying: false,
-      visualScale: 2.0,   // starts at 2x, shrinks to ~1x in flight
-      restingScale: 2.0,  // the scale when sitting at home
+      visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
+      restingScale: 2.6,  // the scale when sitting at home
       // Flight params (set on kick)
       groundX: 0,
       groundY: 0,
@@ -289,18 +289,15 @@
     };
 
     // Swipe-across tracking
-    // Finger swipes ACROSS the ball — kick fires when finger enters the ball zone
+    // Full flow: swipe across ball → lift finger → line stays visible → ball launches
     let touchActive = false;
-    let touchPoints = [];      // recent points for velocity calc
-    let allTouchPoints = [];   // ALL points for trail drawing & curvature
+    let allTouchPoints = [];   // ALL points for trail drawing, analysis & curvature
     let kickFired = false;
+    let crossedBall = false;   // did the swipe pass through the ball?
+    let swipeTrailDisplay = []; // persisted trail shown after finger lifts
+    let swipeTrailFade = 0;     // countdown for fading the trail after kick
 
     // Goal dimensions — mapped to gameplayBG.jpg
-    // Image is 1080x1920, game coords are 540x960 (half)
-    // Crossbar at ~y530 in image = 265 in game
-    // Goal bottom moved up 50px to 440 in game
-    // Left post at ~x155 in image = 77 in game
-    // Right post at ~x925 in image = 463 in game
     const goal = {
       x: 77,
       y: 265,
@@ -320,13 +317,12 @@
       const usableW = goal.width - padding * 2;
       const usableH = goal.height - padding * 2;
 
-      // Place 5 targets spread across the goal
       const positions = [
-        { x: 0.08, y: 0.2 },   // top-left (pushed wider)
-        { x: 0.92, y: 0.2 },   // top-right (pushed wider)
-        { x: 0.5, y: 0.15 },   // top-center
-        { x: 0.18, y: 0.78 },  // bottom-left (pushed wider & lower)
-        { x: 0.82, y: 0.78 },  // bottom-right (pushed wider & lower)
+        { x: 0.08, y: 0.2 },
+        { x: 0.92, y: 0.2 },
+        { x: 0.5, y: 0.15 },
+        { x: 0.18, y: 0.78 },
+        { x: 0.82, y: 0.78 },
       ];
 
       for (let i = 0; i < TARGET_COUNT; i++) {
@@ -371,7 +367,7 @@
     }
 
     // ============================================================
-    // INPUT HANDLING — swipe across the ball
+    // INPUT HANDLING — swipe across ball, analyze on release
     // ============================================================
     function getInputPos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -408,12 +404,12 @@
 
       touchActive = true;
       kickFired = false;
-      touchPoints = [];
+      crossedBall = false;
       allTouchPoints = [];
+      swipeTrailDisplay = [];
+      swipeTrailFade = 0;
       const pos = getInputPos(e);
-      const pt = { x: pos.x, y: pos.y, time: Date.now() };
-      touchPoints.push(pt);
-      allTouchPoints.push(pt);
+      allTouchPoints.push({ x: pos.x, y: pos.y, time: Date.now() });
     }
 
     function onMove(e) {
@@ -422,42 +418,82 @@
 
       const pos = getInputPos(e);
       const now = Date.now();
-      const pt = { x: pos.x, y: pos.y, time: now };
-      touchPoints.push(pt);
-      allTouchPoints.push(pt);
+      allTouchPoints.push({ x: pos.x, y: pos.y, time: now });
 
-      // Keep only last ~15 points for velocity calc
-      if (touchPoints.length > 15) touchPoints.shift();
-
-      // Check if finger just crossed into the ball zone
-      const hitRadius = ball.radius * ball.visualScale * 1.2;
-      const dist = distTo(pos.x, pos.y, ball.x, ball.y);
-
-      if (dist < hitRadius && touchPoints.length >= 3) {
-        // Finger is inside the ball — compute swipe velocity from recent points
-        const recent = touchPoints.slice(-6);
-        const first = recent[0];
-        const last = recent[recent.length - 1];
-        const dx = last.x - first.x;
-        const dy = last.y - first.y;
-        const swipeDist = Math.sqrt(dx * dx + dy * dy);
-        const elapsed = (last.time - first.time) / 1000;
-
-        // Must be swiping upward with some speed
-        if (swipeDist > 10 && dy < -5 && elapsed > 0) {
-          // Calculate curvature from all touch points
-          const curvature = calculateCurvature(allTouchPoints);
-          fireKick(dx, dy, swipeDist, elapsed, curvature);
-          kickFired = true;
+      // Check if finger has crossed through the ball zone
+      if (!crossedBall) {
+        const hitRadius = ball.radius * ball.visualScale * 1.2;
+        const dist = distTo(pos.x, pos.y, ball.x, ball.y);
+        if (dist < hitRadius) {
+          crossedBall = true;
         }
       }
     }
 
     function onUp(e) {
+      if (!touchActive) return;
       touchActive = false;
-      touchPoints = [];
+
+      // Only kick if the swipe crossed through the ball
+      if (!crossedBall || allTouchPoints.length < 4 || kickFired) {
+        allTouchPoints = [];
+        return;
+      }
+
+      // Analyze the FULL swipe path
+      const pts = allTouchPoints;
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      const dx = last.x - first.x;
+      const dy = last.y - first.y;
+      const totalDist = Math.sqrt(dx * dx + dy * dy);
+      const totalElapsed = (last.time - first.time) / 1000;
+
+      // Must be swiping upward with some distance
+      if (totalDist < 15 || dy > -5 || totalElapsed <= 0) {
+        allTouchPoints = [];
+        return;
+      }
+
+      // Persist the trail for display
+      swipeTrailDisplay = [...allTouchPoints];
+      swipeTrailFade = 1.0; // will fade out over time
+
+      // Calculate curvature from the full path
+      const curvature = calculateCurvature(pts);
+
+      // Use the segment near the ball crossing for direction/power
+      // Find the points around where the finger crossed the ball
+      const ballCrossIdx = findBallCrossIndex(pts);
+      const nearPoints = pts.slice(Math.max(0, ballCrossIdx - 4), Math.min(pts.length, ballCrossIdx + 4));
+      const nearFirst = nearPoints[0];
+      const nearLast = nearPoints[nearPoints.length - 1];
+      const nearDx = nearLast.x - nearFirst.x;
+      const nearDy = nearLast.y - nearFirst.y;
+      const nearDist = Math.sqrt(nearDx * nearDx + nearDy * nearDy);
+      const nearElapsed = (nearLast.time - nearFirst.time) / 1000;
+
+      // Fire the kick with a tiny delay so player sees the full trail
+      kickFired = true;
+      setTimeout(() => {
+        fireKick(nearDx, nearDy, nearDist, Math.max(nearElapsed, 0.01), curvature);
+      }, 120);
+
       allTouchPoints = [];
-      kickFired = false;
+    }
+
+    // Find the index in the touch points array closest to the ball center
+    function findBallCrossIndex(pts) {
+      let minDist = Infinity;
+      let minIdx = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const d = distTo(pts[i].x, pts[i].y, ball.x, ball.y);
+        if (d < minDist) {
+          minDist = d;
+          minIdx = i;
+        }
+      }
+      return minIdx;
     }
 
     // Calculate curvature of the swipe path
@@ -465,8 +501,6 @@
     function calculateCurvature(points) {
       if (points.length < 5) return 0;
 
-      // Sum up the cross products of consecutive segments
-      // This tells us how much the path curves left vs right
       let totalCross = 0;
       let totalLength = 0;
 
@@ -476,7 +510,6 @@
         const bx = points[i + 1].x - points[i].x;
         const by = points[i + 1].y - points[i].y;
 
-        // Cross product: positive = turning right, negative = turning left
         const cross = ax * by - ay * bx;
         const segLen = Math.sqrt(ax * ax + ay * ay);
         totalCross += cross;
@@ -484,20 +517,18 @@
       }
 
       if (totalLength < 10) return 0;
-
-      // Normalize by path length so longer swipes don't auto-spin more
       return totalCross / totalLength;
     }
 
     function fireKick(dx, dy, swipeDist, elapsed, curvature) {
       const power = Math.min(swipeDist / Math.max(elapsed, 0.05) * 0.01, 1.0);
 
-      // Horizontal aim — 30% further than before (dx * 3 → dx * 3.9)
+      // Horizontal aim — 30% further
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 40, Math.min(goal.x + goal.width - 40, aimX));
       const horizonY = goal.y + goal.height;
 
-      // Spin from curvature — clamp to reasonable range
+      // Spin from curvature
       const spinAmount = Math.max(-3, Math.min(3, curvature * 0.8));
 
       ball.startX = ball.homeX;
@@ -917,18 +948,31 @@
     }
 
     function drawSwipeTrail() {
-      if (!touchActive || allTouchPoints.length < 2) return;
+      // Determine which points to draw: active swipe or persisted trail
+      let pts = null;
+      let fadeAlpha = 1.0;
 
-      const pts = allTouchPoints;
+      if (touchActive && allTouchPoints.length >= 2) {
+        pts = allTouchPoints;
+      } else if (swipeTrailDisplay.length >= 2 && swipeTrailFade > 0) {
+        pts = swipeTrailDisplay;
+        fadeAlpha = swipeTrailFade;
+        // Fade the persisted trail
+        swipeTrailFade -= 0.015;
+        if (swipeTrailFade <= 0) {
+          swipeTrailDisplay = [];
+        }
+      }
 
-      // Draw the full swipe path — thick, bright, visible
-      // Color shifts from white to orange/green based on curvature direction
+      if (!pts) return;
+
+      // Draw the full swipe path — thick, bright, color-coded by curvature
       for (let i = 1; i < pts.length; i++) {
         const progress = i / pts.length;
-        const alpha = 0.3 + progress * 0.5;
+        const alpha = (0.3 + progress * 0.5) * fadeAlpha;
 
         // Compute local curvature for color
-        let color = `rgba(255, 255, 255, ${alpha})`; // default white
+        let color = `rgba(255, 255, 255, ${alpha})`;
         if (i > 1 && i < pts.length - 1) {
           const ax = pts[i].x - pts[i - 1].x;
           const ay = pts[i].y - pts[i - 1].y;
@@ -936,14 +980,14 @@
           const by = pts[i + 1].y - pts[i].y;
           const cross = ax * by - ay * bx;
           if (cross < -2) {
-            color = `rgba(72, 169, 67, ${alpha})`; // green = curving left
+            color = `rgba(72, 169, 67, ${alpha})`;
           } else if (cross > 2) {
-            color = `rgba(255, 178, 122, ${alpha})`; // orange = curving right
+            color = `rgba(255, 178, 122, ${alpha})`;
           }
         }
 
         ctx.strokeStyle = color;
-        ctx.lineWidth = 4 + progress * 3; // gets thicker toward the end
+        ctx.lineWidth = 4 + progress * 3;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
@@ -953,15 +997,28 @@
 
       // Draw dots at each tracked point
       for (let i = 0; i < pts.length; i++) {
-        const alpha = 0.2 + (i / pts.length) * 0.6;
+        const alpha = (0.2 + (i / pts.length) * 0.6) * fadeAlpha;
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.beginPath();
         ctx.arc(pts[i].x, pts[i].y, 2.5, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // If we have enough curvature info, show a spin indicator near the ball
-      if (!kickFired && pts.length >= 6) {
+      // Start dot — big green circle
+      ctx.fillStyle = `rgba(72, 169, 67, ${0.7 * fadeAlpha})`;
+      ctx.beginPath();
+      ctx.arc(pts[0].x, pts[0].y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // End dot — big orange circle
+      const last = pts[pts.length - 1];
+      ctx.fillStyle = `rgba(255, 178, 122, ${0.7 * fadeAlpha})`;
+      ctx.beginPath();
+      ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Spin indicator while actively swiping
+      if (touchActive && pts.length >= 6) {
         const curv = calculateCurvature(pts);
         if (Math.abs(curv) > 0.3) {
           ctx.fillStyle = curv < 0 ? 'rgba(72, 169, 67, 0.7)' : 'rgba(255, 178, 122, 0.7)';
