@@ -186,7 +186,7 @@
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
-    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.2</div>
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.3</div>
   </div>
 
   <!-- End Screen -->
@@ -289,8 +289,8 @@
       x: GW / 2,          // screen x
       y: GH + 80,         // starts off-screen bottom for entrance roll
       radius: BALL_RADIUS,
-      homeX: GW / 2,
-      homeY: GH - 135,    // moved up 10px
+      homeX: GW / 2 + 1,
+      homeY: GH - 145,    // up 10px more
       flying: false,
       visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
       restingScale: 2.6,  // the scale when sitting at home
@@ -334,7 +334,7 @@
       x: 77,
       y: 265,
       width: 386,
-      height: 180,         // lowered ground plane by 5px (was 175)
+      height: 183,         // lowered ground plane 3px more
       postWidth: 10,
       netColor: 'rgba(255,255,255,0.0)',
     };
