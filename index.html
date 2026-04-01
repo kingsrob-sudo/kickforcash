@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.1</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.2</div>
     </div>
   </div>
 
@@ -794,9 +794,10 @@
     }
 
     function fireKick(dx, dy, swipeLength, spinDeviation) {
-      // Power from swipe length — lower threshold so short flicks still reach the goal
-      // A quick flick (~40px) = decent power, long swipe (~150px+) = full power
-      const power = Math.min(swipeLength / 120, 1.0);
+      // Power from swipe length — very responsive, easy to reach full power
+      // Even a quick flick (~30px) gets decent power, moderate swipe = full power
+      // Power can exceed 1.0 for hard swipes to allow overkicking
+      const power = Math.min(swipeLength / 80, 1.5);
 
       // Direction from the start→end vector angle
       const angle = Math.atan2(dy, dx);
@@ -814,8 +815,8 @@
       ball.targetX = clampedX;
       ball.targetY = horizonY;
       ball.flightT = 0;
-      ball.flightSpeed = (0.015 + power * 0.018) * 0.5; // faster flight
-      ball.arcHeight = 120 + power * 160;
+      ball.flightSpeed = (0.016 + power * 0.02) * 0.5; // faster overall
+      ball.arcHeight = 100 + power * 180;
       ball.ballHeight = 0;
       ball.flying = true;
       ball.visualScale = ball.restingScale;
@@ -913,13 +914,18 @@
 
       if (ball.phase === 'arc') {
         // ── ARC PHASE: parametric parabola from player to horizon ──
-        ball.flightT += ball.flightSpeed;
+        // Decelerate: ball advances quickly at start, slows as it travels
+        const decel = 1 - ball.flightT * 0.6; // speed drops to 40% by end of flight
+        ball.flightT += ball.flightSpeed * Math.max(decel, 0.3);
 
         const t = Math.min(ball.flightT, 1.0);
 
-        // Ground position: linear interpolation + spin curve offset
-        const linearX = ball.startX + (ball.targetX - ball.startX) * t;
-        const linearY = ball.startY + (ball.targetY - ball.startY) * t;
+        // Ease-out on ground position so ball visually decelerates in both X and Y
+        const easedT = 1 - Math.pow(1 - t, 1.8);
+
+        // Ground position: eased interpolation + spin curve offset
+        const linearX = ball.startX + (ball.targetX - ball.startX) * easedT;
+        const linearY = ball.startY + (ball.targetY - ball.startY) * easedT;
 
         // Spin curves the ball sideways — bends MORE toward the end of flight
         // t^3 means: barely any curve early, dramatic bend late (banana kick feel)
@@ -1311,14 +1317,12 @@
       }
 
       // Ball shadow — offset scales with ball size
-      // At resting scale (2.6), shadow should be snug below the ball
-      // At far scale (0.45), shadow should be further below proportionally
+      // Starting position shadow is good, far shadow needs to drop further
       const shadowR = drawSize * 0.35;
-      // The ball sprite has ~15% padding in its cell, so the visual bottom
-      // of the ball is about 0.35 * drawSize below center
-      // Scale the gap between ball bottom and shadow based on visual scale
       const normalizedScale = ball.visualScale / ball.restingScale; // 1.0 at rest, ~0.17 at far
-      const shadowGap = 5 + (1 - normalizedScale) * 15; // small gap at rest, bigger gap when small
+      // At rest: offset is drawSize * 0.33 + 5 (snug)
+      // At far: offset needs to be much further below since ball is tiny
+      const shadowGap = 5 + (1 - normalizedScale) * 35;
       const shadowYOffset = drawSize * 0.33 + shadowGap;
       if (!ball.flying && !ball.entering) {
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
