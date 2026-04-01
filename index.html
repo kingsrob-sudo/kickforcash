@@ -186,7 +186,7 @@
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
-    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.3</div>
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.4</div>
   </div>
 
   <!-- End Screen -->
@@ -699,6 +699,9 @@
         // Check collisions during flight
         checkTargetCollisions();
 
+        // Check post/crossbar collisions
+        checkPostCollisions();
+
         // ── NET WALL CHECK: ball hit the back of the net? ──
         if (ball.groundY <= netWallY && ball.ballHeight > 0) {
           // Ball has reached the back of the net while still airborne
@@ -763,24 +766,42 @@
         ball.x = ball.groundX;
         ball.y = ball.bounceGroundY - ball.ballHeight;
 
-        // Keep checking collisions during bounces
+        // Check collisions during bounces
         checkTargetCollisions();
+        checkPostCollisions();
+        checkSideWallCollisions();
       }
     }
 
     function checkTargetCollisions() {
-      const ballEffectiveRadius = ball.radius * ball.visualScale;
+      const ballR = ball.radius * ball.visualScale;
+
       for (const t of targets) {
         if (!t.alive) continue;
-        // Check if ball overlaps target — use the screen position (ball.x, ball.y)
-        // but also check ground proximity to see if the ball is at the right "depth"
         const d = distTo(ball.x, ball.y, t.x, t.y);
-        if (d < ballEffectiveRadius + t.radius) {
+        if (d < ballR + t.radius) {
           t.alive = false;
           t.hitAnim = 1;
           score += 100;
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y - 30, 100);
+
+          // ── BOUNCE OFF TARGET SURFACE ──
+          // If still in arc phase, transition to bounce with deflection
+          if (ball.phase === 'arc') {
+            ball.phase = 'bounce';
+            ball.bounceGroundY = ball.groundY;
+            // Reflect roughly — bounce back toward the player
+            ball.bounceVY = -5;
+            // Horizontal deflection based on which side of the target we hit
+            const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
+            ball.bounceVX = Math.cos(hitAngle) * 3;
+          } else if (ball.phase === 'bounce') {
+            // Already bouncing — deflect off the target
+            ball.bounceVY = -Math.abs(ball.bounceVY) * 0.6 - 2;
+            const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
+            ball.bounceVX = Math.cos(hitAngle) * 2.5;
+          }
 
           // Check if all targets are down
           if (targets.every(tt => !tt.alive)) {
@@ -789,6 +810,87 @@
             }, 600);
           }
         }
+      }
+    }
+
+    // Check collisions with goal posts (crossbar + side posts)
+    // Called during arc phase — transitions to bounce on hit
+    function checkPostCollisions() {
+      const ballR = ball.radius * ball.visualScale;
+      const postLeft = goal.x + goal.postWidth;
+      const postRight = goal.x + goal.width - goal.postWidth;
+      const crossbarBottom = goal.y + goal.postWidth;
+      const goalBottom = goal.y + goal.height;
+
+      // Only check when ball is in the goal region vertically
+      if (ball.y > crossbarBottom - ballR && ball.y < goalBottom + ballR) {
+
+        // ── LEFT POST ──
+        if (ball.x - ballR < postLeft && ball.x + ballR > goal.x &&
+            ball.y > goal.y - ballR && ball.y < goalBottom) {
+          if (ball.phase === 'arc') {
+            ball.phase = 'bounce';
+            ball.bounceGroundY = ball.groundY;
+            ball.bounceVY = -4;
+            ball.bounceVX = 3; // deflect right
+            ball.groundX = postLeft + ballR + 1;
+            spawnParticles(postLeft, ball.y);
+          } else if (ball.phase === 'bounce') {
+            ball.bounceVX = Math.abs(ball.bounceVX) * 0.7 + 1;
+            ball.groundX = postLeft + ballR + 1;
+            spawnParticles(postLeft, ball.y);
+          }
+        }
+
+        // ── RIGHT POST ──
+        if (ball.x + ballR > postRight && ball.x - ballR < goal.x + goal.width &&
+            ball.y > goal.y - ballR && ball.y < goalBottom) {
+          if (ball.phase === 'arc') {
+            ball.phase = 'bounce';
+            ball.bounceGroundY = ball.groundY;
+            ball.bounceVY = -4;
+            ball.bounceVX = -3; // deflect left
+            ball.groundX = postRight - ballR - 1;
+            spawnParticles(postRight, ball.y);
+          } else if (ball.phase === 'bounce') {
+            ball.bounceVX = -Math.abs(ball.bounceVX) * 0.7 - 1;
+            ball.groundX = postRight - ballR - 1;
+            spawnParticles(postRight, ball.y);
+          }
+        }
+      }
+
+      // ── CROSSBAR ──
+      if (ball.y - ballR < crossbarBottom && ball.y + ballR > goal.y &&
+          ball.x > postLeft && ball.x < postRight) {
+        if (ball.phase === 'arc' && ball.ballHeight > 0) {
+          ball.phase = 'bounce';
+          ball.bounceGroundY = ball.groundY;
+          ball.bounceVY = 3; // deflect downward
+          ball.bounceVX = ball.spin * 0.5;
+          spawnParticles(ball.x, crossbarBottom);
+        }
+      }
+    }
+
+    // Check side wall collisions inside the net during bounce phase
+    function checkSideWallCollisions() {
+      if (ball.phase !== 'bounce') return;
+
+      const ballR = ball.radius * ball.visualScale;
+      const wallLeft = goal.x + goal.postWidth + ballR;
+      const wallRight = goal.x + goal.width - goal.postWidth - ballR;
+
+      if (ball.groundX < wallLeft) {
+        ball.groundX = wallLeft;
+        ball.bounceVX = Math.abs(ball.bounceVX) * 0.6;
+        spawnParticles(goal.x + goal.postWidth, ball.y);
+      }
+
+      if (ball.groundX > wallRight) {
+        ball.groundX = wallRight;
+        ball.bounceVX = -Math.abs(ball.bounceVX) * 0.6;
+        spawnParticles(goal.x + goal.width - goal.postWidth, ball.y);
       }
     }
 
