@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.9</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.2</div>
     </div>
   </div>
 
@@ -584,12 +584,12 @@
     let swipeTrailDisplay = []; // persisted trail shown after finger lifts
     let swipeTrailFade = 0;     // countdown for fading the trail after kick
 
-    // Goal dimensions — mapped to gameplayBG.jpg
+    // Goal dimensions — expanded to match art
     const goal = {
-      x: 77,
-      y: 265,
-      width: 386,
-      height: 183,         // lowered ground plane 3px more
+      x: 37,              // 77 - 40 (expanded left 40px)
+      y: 255,             // 265 - 10 (crossbar 10px higher)
+      width: 466,         // 386 + 80 (expanded 40px each side)
+      height: 198,        // 183 + 10 (taller top) + 5 (lower bottom)
       postWidth: 10,
       netColor: 'rgba(255,255,255,0.0)',
     };
@@ -686,7 +686,9 @@
 
     function onDown(e) {
       e.preventDefault();
-      if (gameState !== 'playing' || ball.flying || ball.entering) return;
+      if (gameState !== 'playing' || ball.entering) return;
+      // Allow kicking even if previous ball is bouncing — it'll become a dead ball
+      if (ball.flying && ball.phase === 'flight') return;
 
       touchActive = true;
       kickFired = false;
@@ -800,9 +802,24 @@
     }
 
     function fireKick(dx, dy, swipeSpeed, spinDeviation) {
+      // If ball is currently bouncing, convert it to a dead ball first
+      if (ball.flying && ball.phase === 'bounce') {
+        const deadR = ball.radius * ball.visualScale * 1.5;
+        const deadShadowY = ball.bounceGroundY + deadR * 0.65;
+        deadBalls.push({
+          x: ball.x,
+          y: ball.y,
+          visualScale: ball.visualScale,
+          frame: ballFrame,
+          shadowX: ball.groundX,
+          shadowY: deadShadowY,
+          shadowRx: deadR * 0.6,
+          shadowRy: deadR * 0.18,
+          spawnTime: Date.now(),
+        });
+      }
+
       // Power from swipe SPEED (px/sec) — not distance
-      // Slow swipe (~200 px/s) = gentle tap, fast flick (~1500+ px/s) = full power
-      // This gives real dynamic range between soft and hard kicks
       const power = Math.min(Math.max((swipeSpeed - 150) / 1200, 0.1), 1.5);
 
       const aimX = ball.homeX + dx * 3.9;
@@ -970,7 +987,8 @@
           ball.phase = 'bounce';
           ball.bounceVY = -6;
           ball.bounceVX = ball.spin * 0.5 + (Math.random() - 0.5) * 4;
-          ball.bounceGroundY = ball.groundScreenY;
+          // Bounce at the visible goal ground plane, not wherever depth mapped to
+          ball.bounceGroundY = ball.visibleHorizonY;
           ball.arcY = Math.min(ball.arcY, 0);
         }
 
@@ -980,7 +998,8 @@
           ball.phase = 'bounce';
           ball.bounceVY = -Math.abs(ball.arcVY) * 0.5;
           ball.bounceVX = (Math.random() - 0.5) * 3;
-          ball.bounceGroundY = ball.groundScreenY;
+          // Use the goal ground plane
+          ball.bounceGroundY = ball.visibleHorizonY;
         }
 
         // Ball went off screen sideways
@@ -1062,8 +1081,8 @@
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundScreenY;
-            // Random angle in a wide spread (mostly sideways/upward)
+            ball.bounceGroundY = ball.y;
+            ball.arcY = 0;
             const randomAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.2;
             const bounceSpeed = 2.5 + Math.random() * 3;
             ball.bounceVY = Math.sin(randomAngle) * bounceSpeed - 2;
@@ -1107,7 +1126,8 @@
             ball.y > goal.y - ballR && ball.y < goalBottom) {
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
+            ball.bounceGroundY = ball.y;
+            ball.arcY = 0;
             ball.bounceVY = -4;
             ball.bounceVX = 3;
             ball.groundX = postLeft + ballR + 1;
@@ -1124,7 +1144,8 @@
             ball.y > goal.y - ballR && ball.y < goalBottom) {
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
+            ball.bounceGroundY = ball.y;
+            ball.arcY = 0;
             ball.bounceVY = -4;
             ball.bounceVX = -3;
             ball.groundX = postRight - ballR - 1;
@@ -1142,8 +1163,10 @@
           ball.x > postLeft && ball.x < postRight) {
         if (ball.phase === 'flight' && ball.arcVY > 0 && ball.depth > visibleDepth * 0.5) {
           ball.phase = 'bounce';
-          ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
-          ball.bounceVY = 3;
+          // Bounce starts from where the ball IS, not the goal bottom
+          ball.bounceGroundY = ball.y;
+          ball.arcY = 0;
+          ball.bounceVY = 3; // deflect downward
           ball.bounceVX = ball.spin * 0.5;
           spawnParticles(ball.x, crossbarBottom);
         }
@@ -1155,19 +1178,19 @@
       if (ball.phase !== 'bounce') return;
 
       const ballR = ball.radius * ball.visualScale;
-      const wallLeft = goal.x + goal.postWidth + ballR;
-      const wallRight = goal.x + goal.width - goal.postWidth - ballR;
+      const wallLeft = goal.x + goal.postWidth - 30 + ballR;   // 30px wider
+      const wallRight = goal.x + goal.width - goal.postWidth + 30 - ballR; // 30px wider
 
       if (ball.groundX < wallLeft) {
         ball.groundX = wallLeft;
         ball.bounceVX = Math.abs(ball.bounceVX) * 0.6;
-        spawnParticles(goal.x + goal.postWidth, ball.y);
+        spawnParticles(goal.x + goal.postWidth - 30, ball.y);
       }
 
       if (ball.groundX > wallRight) {
         ball.groundX = wallRight;
         ball.bounceVX = -Math.abs(ball.bounceVX) * 0.6;
-        spawnParticles(goal.x + goal.width - goal.postWidth, ball.y);
+        spawnParticles(goal.x + goal.width - goal.postWidth + 30, ball.y);
       }
     }
 
@@ -1229,8 +1252,6 @@
       // Goal outer box (full goal area)
       ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
       ctx.strokeRect(goal.x, goal.y, goal.width, goal.height);
-
-      // Label
       ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
       ctx.font = '10px Arial';
       ctx.textAlign = 'left';
@@ -1275,36 +1296,25 @@
       ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
       ctx.fillText('GROUND PLANE', goal.x + 2, goal.y + goal.height - 3);
 
-      // Net wall (where ball bounces off back of net)
-      const netWallDepthPct = 0.65;
-      const visibleDepth = ball.homeY - ball.visibleHorizonY;
-      // Convert net wall depth to screen Y
-      const netWallScreenY = ball.homeY - visibleDepth * netWallDepthPct;
-      // This is approximate — show it as a reference
-      ctx.strokeStyle = 'rgba(255, 0, 255, 0.7)';
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(goal.x, netWallScreenY);
-      ctx.lineTo(goal.x + goal.width, netWallScreenY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255, 0, 255, 0.7)';
-      ctx.fillText('NET WALL (back)', goal.x + 2, netWallScreenY - 3);
-
-      // Side walls inside net (same as posts but labeled differently)
-      ctx.strokeStyle = 'rgba(255, 128, 0, 0.5)';
+      // Side walls inside net (extended 30px outward from posts)
+      const sideWallLeft = postLeft - 30;
+      const sideWallRight = postRight + 30;
+      ctx.strokeStyle = 'rgba(255, 128, 0, 0.6)';
       ctx.setLineDash([4, 4]);
-      // Left wall
       ctx.beginPath();
-      ctx.moveTo(postLeft, goal.y);
-      ctx.lineTo(postLeft, goal.y + goal.height);
+      ctx.moveTo(sideWallLeft, goal.y);
+      ctx.lineTo(sideWallLeft, goal.y + goal.height);
       ctx.stroke();
-      // Right wall
       ctx.beginPath();
-      ctx.moveTo(postRight, goal.y);
-      ctx.lineTo(postRight, goal.y + goal.height);
+      ctx.moveTo(sideWallRight, goal.y);
+      ctx.lineTo(sideWallRight, goal.y + goal.height);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255, 128, 0, 0.6)';
+      ctx.textAlign = 'left';
+      ctx.fillText('L SIDE WALL', sideWallLeft + 2, goal.y + 24);
+      ctx.textAlign = 'right';
+      ctx.fillText('R SIDE WALL', sideWallRight - 2, goal.y + 24);
     }
 
     function drawBallShadow() {
