@@ -244,6 +244,22 @@
     bgImage.onload = () => { bgLoaded = true; };
 
     // ============================================================
+    // BALL SPRITE SHEET
+    // ============================================================
+    const ballSheet = new Image();
+    ballSheet.src = 'ball_all_.png';
+    let ballSheetLoaded = false;
+    ballSheet.onload = () => { ballSheetLoaded = true; };
+
+    // Sprite sheet config: 8x8 grid, 128px cells, ball ~88x86 centered
+    const SPRITE_COLS = 8;
+    const SPRITE_ROWS = 8;
+    const SPRITE_CELL = 128;
+    const SPRITE_TOTAL = 64;
+    let ballFrame = 0;         // current frame index (0-63)
+    let ballFrameAccum = 0;    // accumulator for frame stepping
+
+    // ============================================================
     // GAME STATE
     // ============================================================
     let gameState = 'start'; // start | playing | ended
@@ -863,67 +879,53 @@
 
     function drawBall() {
       const r = ball.radius * ball.visualScale;
+      const drawSize = r * 2;
 
-      ctx.save();
-      ctx.translate(ball.x, ball.y);
-      // Apply spin rotation
-      if (ball.flying) {
-        ctx.rotate(ball.rotation);
+      // Advance sprite frame based on spin speed
+      if (ball.flying && ball.rotationSpeed !== 0) {
+        // Step through frames based on spin — faster spin = faster frame cycling
+        ballFrameAccum += Math.abs(ball.rotationSpeed) * 2.5;
+        if (ballFrameAccum >= 1) {
+          const steps = Math.floor(ballFrameAccum);
+          ballFrameAccum -= steps;
+          if (ball.rotationSpeed > 0) {
+            ballFrame = (ballFrame + steps) % SPRITE_TOTAL;
+          } else {
+            ballFrame = (ballFrame - steps + SPRITE_TOTAL) % SPRITE_TOTAL;
+          }
+        }
       }
 
       // Ball shadow (resting)
       if (!ball.flying) {
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.beginPath();
-        ctx.ellipse(4, r + 5, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(ball.x + 4, ball.y + r + 5, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Ball body
-      const ballGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
-      ballGrad.addColorStop(0, '#ffffff');
-      ballGrad.addColorStop(0.6, '#e8e8e8');
-      ballGrad.addColorStop(1, '#bbbbbb');
-      ctx.fillStyle = ballGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw sprite frame
+      if (ballSheetLoaded) {
+        const col = ballFrame % SPRITE_COLS;
+        const row = Math.floor(ballFrame / SPRITE_COLS);
+        const sx = col * SPRITE_CELL;
+        const sy = row * SPRITE_CELL;
 
-      // Pentagon pattern (simplified soccer ball look)
-      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-      ctx.lineWidth = 1.5 * ball.visualScale;
-      // Draw a simple pentagon in the center
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-        const px = Math.cos(angle) * r * 0.4;
-        const py = Math.sin(angle) * r * 0.4;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(0,0,0,0.08)';
-      ctx.fill();
-      ctx.stroke();
-
-      // Lines from pentagon to edge
-      for (let i = 0; i < 5; i++) {
-        const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-        const ix = Math.cos(angle) * r * 0.4;
-        const iy = Math.sin(angle) * r * 0.4;
-        const ox = Math.cos(angle) * r * 0.85;
-        const oy = Math.sin(angle) * r * 0.85;
+        ctx.drawImage(
+          ballSheet,
+          sx, sy, SPRITE_CELL, SPRITE_CELL,  // source rect
+          ball.x - drawSize / 2, ball.y - drawSize / 2, drawSize, drawSize  // dest rect
+        );
+      } else {
+        // Fallback: simple circle while loading
+        ctx.fillStyle = '#ddd';
         ctx.beginPath();
-        ctx.moveTo(ix, iy);
-        ctx.lineTo(ox, oy);
-        ctx.stroke();
+        ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
+        ctx.fill();
       }
-
-      ctx.restore();
 
       // Swipe-across hint when not flying
       if (!ball.flying && gameState === 'playing') {
-        // Upward arrow hint above ball
         const hintY = ball.y - r - 20;
         ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.004) * 0.15;
         ctx.fillStyle = '#FFB27A';
