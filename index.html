@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.3</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.4</div>
     </div>
   </div>
 
@@ -1086,8 +1086,8 @@
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.y;
-            ball.arcY = 0;
+            ball.bounceGroundY = ball.visibleHorizonY;
+            ball.arcY = ball.y - ball.visibleHorizonY; // negative = above ground
             const randomAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.2;
             const bounceSpeed = 2.5 + Math.random() * 3;
             ball.bounceVY = Math.sin(randomAngle) * bounceSpeed - 2;
@@ -1131,8 +1131,8 @@
             ball.y > goal.y - ballR && ball.y < goalBottom) {
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.y;
-            ball.arcY = 0;
+            ball.bounceGroundY = ball.visibleHorizonY;
+            ball.arcY = ball.y - ball.visibleHorizonY;
             ball.bounceVY = -4;
             ball.bounceVX = 3;
             ball.groundX = postLeft + ballR + 1;
@@ -1149,8 +1149,8 @@
             ball.y > goal.y - ballR && ball.y < goalBottom) {
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.y;
-            ball.arcY = 0;
+            ball.bounceGroundY = ball.visibleHorizonY;
+            ball.arcY = ball.y - ball.visibleHorizonY;
             ball.bounceVY = -4;
             ball.bounceVX = -3;
             ball.groundX = postRight - ballR - 1;
@@ -1168,9 +1168,8 @@
           ball.x > postLeft && ball.x < postRight) {
         if (ball.phase === 'flight' && ball.arcVY > 0 && ball.depth > visibleDepth * 0.5) {
           ball.phase = 'bounce';
-          // Bounce starts from where the ball IS, not the goal bottom
-          ball.bounceGroundY = ball.y;
-          ball.arcY = 0;
+          ball.bounceGroundY = ball.visibleHorizonY;
+          ball.arcY = ball.y - ball.visibleHorizonY;
           ball.bounceVY = 3; // deflect downward
           ball.bounceVX = ball.spin * 0.5;
           spawnParticles(ball.x, crossbarBottom);
