@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Georgia Lottery Soccer Kick</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+      touch-action: none;
+      position: fixed;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Start Screen Overlay */
+    #startScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.4s ease;
+    }
+
+    #startScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .start-logo {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #FFB27A;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .start-title {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #fff;
+      text-align: center;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .start-title span {
+      color: #48A943;
+    }
+
+    .start-subtitle {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 3rem;
+      text-align: center;
+    }
+
+    .start-btn {
+      padding: 1.2rem 4rem;
+      font-size: 1.4rem;
+      font-weight: bold;
+      background: #48A943;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      box-shadow: 0 8px 30px rgba(72, 169, 67, 0.4);
+      transition: transform 0.15s ease;
+    }
+
+    .start-btn:active {
+      transform: scale(0.95);
+    }
+
+    .start-hint {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* End Screen */
+    #endScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    #endScreen.active {
+      display: flex;
+    }
+
+    .end-label {
+      font-size: 1rem;
+      color: #FFB27A;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .end-title {
+      font-size: 2rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+    }
+
+    .end-score {
+      font-size: 5rem;
+      font-weight: 900;
+      color: #48A943;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .end-score-label {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 3rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .end-btn {
+      padding: 1rem 3rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background: #48A943;
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      box-shadow: 0 8px 30px rgba(72, 169, 67, 0.4);
+      transition: transform 0.15s ease;
+    }
+
+    .end-btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Start Screen -->
+  <div id="startScreen">
+    <div class="start-logo">Georgia Lottery</div>
+    <div class="start-title">Soccer<br><span>Kick</span></div>
+    <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
+    <button class="start-btn" id="startBtn">Play</button>
+    <div class="start-hint">Swipe across the ball to shoot</div>
+  </div>
+
+  <!-- End Screen -->
+  <div id="endScreen">
+    <div class="end-label">Time's Up!</div>
+    <div class="end-title">Final Score</div>
+    <div class="end-score" id="finalScore">0</div>
+    <div class="end-score-label">Points</div>
+    <button class="end-btn" id="replayBtn">Play Again</button>
+  </div>
+
+  <script>
+    // ============================================================
+    // CANVAS SETUP
+    // ============================================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Design at 9:16 aspect ratio
+    const ASPECT = 9 / 16;
+    let W, H, scale;
+
+    // Internal game resolution
+    const GW = 540;
+    const GH = 960;
+
+    function resize() {
+      const ww = window.innerWidth;
+      const wh = window.innerHeight;
+      const windowAspect = ww / wh;
+
+      if (windowAspect > ASPECT) {
+        // Window is wider than 9:16 — fit to height
+        H = wh;
+        W = wh * ASPECT;
+      } else {
+        // Window is taller or equal — fit to width
+        W = ww;
+        H = ww / ASPECT;
+      }
+
+      canvas.width = W;
+      canvas.height = H;
+      scale = W / GW;
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ============================================================
+    // BACKGROUND IMAGE
+    // ============================================================
+    const bgImage = new Image();
+    bgImage.src = 'gameplayBG.jpg';
+    let bgLoaded = false;
+    bgImage.onload = () => { bgLoaded = true; };
+
+    // ============================================================
+    // GAME STATE
+    // ============================================================
+    let gameState = 'start'; // start | playing | ended
+    let score = 0;
+    let timeLeft = 60;
+    let timerInterval = null;
+
+    // Ball — parabolic 3D-faked flight with bouncing
+    // The "ground plane" ends at the horizon line = bottom of goal
+    // Ball arcs up, lands at horizon, bounces a few times, then despawns
+    // Starts at 2x size and shrinks to 1x as it flies away
+    const BALL_RADIUS = 30; // base radius at "normal" size
+    const ball = {
+      x: GW / 2,          // screen x
+      y: GH - 120,        // screen y
+      radius: BALL_RADIUS,
+      homeX: GW / 2,
+      homeY: GH - 120,
+      flying: false,
+      visualScale: 2.0,   // starts at 2x, shrinks to ~1x in flight
+      restingScale: 2.0,  // the scale when sitting at home
+      // Flight params (set on kick)
+      groundX: 0,
+      groundY: 0,
+      startX: 0,
+      startY: 0,
+      targetX: 0,
+      targetY: 0,
+      flightT: 0,
+      flightSpeed: 0,
+      arcHeight: 0,
+      ballHeight: 0,
+      // Bounce state
+      phase: 'arc',       // 'arc' | 'bounce' | 'done'
+      bounceVY: 0,
+      bounceCount: 0,
+      bounceGroundY: 0,
+      bounceVX: 0,
+    };
+
+    // Swipe-across tracking
+    // Finger swipes ACROSS the ball — kick fires when finger enters the ball zone
+    let touchActive = false;
+    let touchPoints = [];  // recent touch positions with timestamps
+    let kickFired = false; // prevent double-kicks per swipe
+
+    // Goal dimensions — mapped to gameplayBG.jpg
+    // Image is 1080x1920, game coords are 540x960 (half)
+    // Crossbar at ~y530 in image = 265 in game
+    // Goal bottom at ~y980 in image = 490 in game
+    // Left post at ~x155 in image = 77 in game
+    // Right post at ~x925 in image = 463 in game
+    const goal = {
+      x: 77,
+      y: 265,
+      width: 386,
+      height: 225,
+      postWidth: 10,
+      netColor: 'rgba(255,255,255,0.0)', // invisible — image has the net
+    };
+
+    // Targets
+    const TARGET_COUNT = 5;
+    let targets = [];
+
+    function spawnTargets() {
+      targets = [];
+      const padding = 30;
+      const usableW = goal.width - padding * 2;
+      const usableH = goal.height - padding * 2;
+
+      // Place 5 targets inside the goal from the background image
+      const positions = [
+        { x: 0.15, y: 0.25 },  // top-left
+        { x: 0.85, y: 0.25 },  // top-right
+        { x: 0.5, y: 0.2 },    // top-center
+        { x: 0.25, y: 0.7 },   // bottom-left
+        { x: 0.75, y: 0.7 },   // bottom-right
+      ];
+
+      for (let i = 0; i < TARGET_COUNT; i++) {
+        const pos = positions[i];
+        targets.push({
+          x: goal.x + padding + usableW * pos.x,
+          y: goal.y + padding + usableH * pos.y,
+          radius: 22,
+          alive: true,
+          hitAnim: 0,
+        });
+      }
+    }
+
+    // Particles for hit effects
+    let particles = [];
+
+    function spawnParticles(x, y) {
+      for (let i = 0; i < 12; i++) {
+        const angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.3;
+        const speed = 2 + Math.random() * 4;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1.0,
+          size: 3 + Math.random() * 4,
+          color: Math.random() > 0.5 ? '#48A943' : '#FFB27A',
+        });
+      }
+    }
+
+    // Score popup
+    let scorePopups = [];
+
+    function spawnScorePopup(x, y, points) {
+      scorePopups.push({
+        x, y,
+        text: '+' + points,
+        life: 1.0,
+      });
+    }
+
+    // ============================================================
+    // INPUT HANDLING — swipe across the ball
+    // ============================================================
+    function getInputPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      let clientX, clientY;
+      if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+      return {
+        x: (clientX - rect.left) / scale,
+        y: (clientY - rect.top) / scale,
+      };
+    }
+
+    function distTo(ax, ay, bx, by) {
+      return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
+    }
+
+    canvas.addEventListener('touchstart', onDown, { passive: false });
+    canvas.addEventListener('mousedown', onDown);
+
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+    canvas.addEventListener('mousemove', onMove);
+
+    canvas.addEventListener('touchend', onUp);
+    canvas.addEventListener('mouseup', onUp);
+
+    function onDown(e) {
+      e.preventDefault();
+      if (gameState !== 'playing' || ball.flying) return;
+
+      touchActive = true;
+      kickFired = false;
+      touchPoints = [];
+      const pos = getInputPos(e);
+      touchPoints.push({ x: pos.x, y: pos.y, time: Date.now() });
+    }
+
+    function onMove(e) {
+      e.preventDefault();
+      if (!touchActive || kickFired) return;
+
+      const pos = getInputPos(e);
+      const now = Date.now();
+      touchPoints.push({ x: pos.x, y: pos.y, time: now });
+
+      // Keep only last ~15 points for velocity calc
+      if (touchPoints.length > 15) touchPoints.shift();
+
+      // Check if finger just crossed into the ball zone
+      const hitRadius = ball.radius * ball.visualScale * 1.2;
+      const dist = distTo(pos.x, pos.y, ball.x, ball.y);
+
+      if (dist < hitRadius && touchPoints.length >= 3) {
+        // Finger is inside the ball — compute swipe velocity from recent points
+        const recent = touchPoints.slice(-6);
+        const first = recent[0];
+        const last = recent[recent.length - 1];
+        const dx = last.x - first.x;
+        const dy = last.y - first.y;
+        const swipeDist = Math.sqrt(dx * dx + dy * dy);
+        const elapsed = (last.time - first.time) / 1000;
+
+        // Must be swiping upward with some speed
+        if (swipeDist > 10 && dy < -5 && elapsed > 0) {
+          fireKick(dx, dy, swipeDist, elapsed);
+          kickFired = true;
+        }
+      }
+    }
+
+    function onUp(e) {
+      touchActive = false;
+      touchPoints = [];
+      kickFired = false;
+    }
+
+    function fireKick(dx, dy, swipeDist, elapsed) {
+      const power = Math.min(swipeDist / Math.max(elapsed, 0.05) * 0.01, 1.0);
+
+      // Horizontal aim based on swipe dx
+      const aimX = ball.homeX + dx * 3;
+      const clampedX = Math.max(goal.x + 40, Math.min(goal.x + goal.width - 40, aimX));
+      const horizonY = goal.y + goal.height;
+
+      ball.startX = ball.homeX;
+      ball.startY = ball.homeY;
+      ball.groundX = ball.homeX;
+      ball.groundY = ball.homeY;
+      ball.targetX = clampedX;
+      ball.targetY = horizonY;
+      ball.flightT = 0;
+      ball.flightSpeed = (0.018 + power * 0.012) * 0.5; // 50% slower
+      ball.arcHeight = 150 + power * 120;
+      ball.ballHeight = 0;
+      ball.flying = true;
+      ball.visualScale = ball.restingScale; // starts at 2x
+      ball.phase = 'arc';
+      ball.bounceCount = 0;
+      ball.bounceVY = 0;
+      ball.bounceVX = 0;
+      ball.bounceGroundY = horizonY;
+    }
+
+    // ============================================================
+    // GAME LOGIC
+    // ============================================================
+    function startGame() {
+      score = 0;
+      timeLeft = 60;
+      ball.x = ball.homeX;
+      ball.y = ball.homeY;
+      ball.groundX = ball.homeX;
+      ball.groundY = ball.homeY;
+      ball.flightT = 0;
+      ball.ballHeight = 0;
+      ball.flying = false;
+      ball.visualScale = ball.restingScale;
+      ball.phase = 'arc';
+      ball.bounceCount = 0;
+      ball.bounceVY = 0;
+      ball.bounceVX = 0;
+      particles = [];
+      scorePopups = [];
+      spawnTargets();
+      gameState = 'playing';
+
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('endScreen').classList.remove('active');
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+          timeLeft = 0;
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      gameState = 'ended';
+      clearInterval(timerInterval);
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('endScreen').classList.add('active');
+    }
+
+    function resetBall() {
+      ball.x = ball.homeX;
+      ball.y = ball.homeY;
+      ball.groundX = ball.homeX;
+      ball.groundY = ball.homeY;
+      ball.flightT = 0;
+      ball.ballHeight = 0;
+      ball.flying = false;
+      ball.visualScale = ball.restingScale;
+      ball.phase = 'arc';
+      ball.bounceCount = 0;
+      ball.bounceVY = 0;
+      ball.bounceVX = 0;
+    }
+
+    function updateBall() {
+      if (!ball.flying) return;
+
+      if (ball.phase === 'arc') {
+        // ── ARC PHASE: parametric parabola from player to horizon ──
+        ball.flightT += ball.flightSpeed;
+
+        const t = Math.min(ball.flightT, 1.0);
+
+        // Ground position: linear interpolation from start to target
+        ball.groundX = ball.startX + (ball.targetX - ball.startX) * t;
+        ball.groundY = ball.startY + (ball.targetY - ball.startY) * t;
+
+        // Parabolic height: peaks at t=0.5, zero at t=0 and t=1
+        ball.ballHeight = 4 * ball.arcHeight * t * (1 - t);
+
+        // Screen position: ground position minus height (up is negative Y)
+        ball.x = ball.groundX;
+        ball.y = ball.groundY - ball.ballHeight;
+
+        // Perspective shrink with ease-out: 2.0 at player → ~0.45 at goal
+        const depthProgress = Math.max(0, Math.min(1, (ball.homeY - ball.groundY) / (ball.homeY - ball.bounceGroundY)));
+        const easedDepth = 1 - Math.pow(1 - depthProgress, 2.5);
+        const farScale = 0.45;
+        ball.visualScale = ball.restingScale - easedDepth * (ball.restingScale - farScale);
+
+        // Check collisions during flight
+        checkTargetCollisions();
+
+        // Arc complete — transition to bounce
+        if (ball.flightT >= 1.0) {
+          ball.phase = 'bounce';
+          // Initial bounce velocity: carry some upward energy
+          ball.bounceVY = -4; // upward kick for first bounce
+          ball.bounceVX = (ball.targetX - ball.startX) * 0.003; // tiny horizontal drift
+          ball.ballHeight = 0;
+        }
+
+        // Ball went off screen sideways
+        if (ball.x < -50 || ball.x > GW + 50) {
+          ball.phase = 'done';
+          setTimeout(resetBall, 100);
+          ball.flying = false;
+        }
+
+      } else if (ball.phase === 'bounce') {
+        // ── BOUNCE PHASE: gravity-driven bounces at the horizon line ──
+        const gravity = 0.35;
+
+        ball.bounceVY += gravity;
+        ball.ballHeight -= ball.bounceVY; // ballHeight is "above ground"
+        ball.groundX += ball.bounceVX;
+
+        // Hit the ground plane
+        if (ball.ballHeight <= 0) {
+          ball.ballHeight = 0;
+          ball.bounceCount++;
+
+          if (ball.bounceCount >= 3) {
+            // Done bouncing — despawn
+            ball.phase = 'done';
+            setTimeout(resetBall, 150);
+            ball.flying = false;
+            return;
+          }
+
+          // Bounce back up with diminishing energy
+          ball.bounceVY = ball.bounceVY * -0.45;
+          ball.bounceVX *= 0.7;
+        }
+
+        // Screen position
+        ball.x = ball.groundX;
+        ball.y = ball.bounceGroundY - ball.ballHeight;
+
+        // Keep checking collisions during bounces
+        checkTargetCollisions();
+      }
+    }
+
+    function checkTargetCollisions() {
+      const ballEffectiveRadius = ball.radius * ball.visualScale;
+      for (const t of targets) {
+        if (!t.alive) continue;
+        // Check if ball overlaps target — use the screen position (ball.x, ball.y)
+        // but also check ground proximity to see if the ball is at the right "depth"
+        const d = distTo(ball.x, ball.y, t.x, t.y);
+        if (d < ballEffectiveRadius + t.radius) {
+          t.alive = false;
+          t.hitAnim = 1;
+          score += 100;
+          spawnParticles(t.x, t.y);
+          spawnScorePopup(t.x, t.y - 30, 100);
+
+          // Check if all targets are down
+          if (targets.every(tt => !tt.alive)) {
+            setTimeout(() => {
+              if (gameState === 'playing') spawnTargets();
+            }, 600);
+          }
+        }
+      }
+    }
+
+    function updateParticles() {
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1;
+        p.life -= 0.025;
+      }
+      particles = particles.filter(p => p.life > 0);
+    }
+
+    function updateScorePopups() {
+      for (const s of scorePopups) {
+        s.y -= 1.5;
+        s.life -= 0.02;
+      }
+      scorePopups = scorePopups.filter(s => s.life > 0);
+    }
+
+    // ============================================================
+    // RENDERING
+    // ============================================================
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      drawBackground();
+      drawBallShadow();
+      drawTargets();
+      drawParticles();
+      drawBall();
+      drawScorePopups();
+      drawHUD();
+      drawSwipeTrail();
+
+      ctx.restore();
+    }
+
+    function drawBackground() {
+      if (bgLoaded) {
+        // Draw the background image scaled to fill the game canvas
+        ctx.drawImage(bgImage, 0, 0, GW, GH);
+      } else {
+        // Fallback while loading
+        ctx.fillStyle = '#1a3a1a';
+        ctx.fillRect(0, 0, GW, GH);
+      }
+    }
+
+    function drawBallShadow() {
+      // Ground-plane shadow during flight — gives depth cue
+      if (ball.flying) {
+        const shadowScale = ball.visualScale;
+        const r = ball.radius * shadowScale;
+        const shadowAlpha = 0.3 * (1 - ball.flightT * 0.5);
+        ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+        ctx.beginPath();
+        ctx.ellipse(ball.groundX, ball.groundY, r * 0.9, r * 0.25, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawTargets() {
+      for (const t of targets) {
+        if (!t.alive) {
+          // Hit animation: fade out
+          if (t.hitAnim > 0) {
+            t.hitAnim -= 0.05;
+            ctx.globalAlpha = t.hitAnim;
+            ctx.fillStyle = '#FFB27A';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.radius * (1 + (1 - t.hitAnim) * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+          continue;
+        }
+
+        // Target outer ring
+        ctx.fillStyle = '#FFB27A';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Target inner ring
+        ctx.fillStyle = '#4D200B';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Target bullseye
+        ctx.fillStyle = '#48A943';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Points label
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('100', t.x, t.y);
+      }
+    }
+
+    function drawBall() {
+      const r = ball.radius * ball.visualScale;
+
+      ctx.save();
+      ctx.translate(ball.x, ball.y);
+
+      // Ball shadow (resting)
+      if (!ball.flying) {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(4, r + 5, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Ball body
+      const ballGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      ballGrad.addColorStop(0, '#ffffff');
+      ballGrad.addColorStop(0.6, '#e8e8e8');
+      ballGrad.addColorStop(1, '#bbbbbb');
+      ctx.fillStyle = ballGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pentagon pattern (simplified soccer ball look)
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1.5 * ball.visualScale;
+      // Draw a simple pentagon in the center
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        const px = Math.cos(angle) * r * 0.4;
+        const py = Math.sin(angle) * r * 0.4;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fill();
+      ctx.stroke();
+
+      // Lines from pentagon to edge
+      for (let i = 0; i < 5; i++) {
+        const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        const ix = Math.cos(angle) * r * 0.4;
+        const iy = Math.sin(angle) * r * 0.4;
+        const ox = Math.cos(angle) * r * 0.85;
+        const oy = Math.sin(angle) * r * 0.85;
+        ctx.beginPath();
+        ctx.moveTo(ix, iy);
+        ctx.lineTo(ox, oy);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Swipe-across hint when not flying
+      if (!ball.flying && gameState === 'playing') {
+        // Upward arrow hint above ball
+        const hintY = ball.y - r - 20;
+        ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.004) * 0.15;
+        ctx.fillStyle = '#FFB27A';
+        ctx.beginPath();
+        ctx.moveTo(ball.x, hintY - 18);
+        ctx.lineTo(ball.x - 12, hintY);
+        ctx.lineTo(ball.x + 12, hintY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawScorePopups() {
+      for (const s of scorePopups) {
+        ctx.globalAlpha = s.life;
+        ctx.fillStyle = '#48A943';
+        ctx.font = 'bold 28px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(s.text, s.x, s.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawSwipeTrail() {
+      if (!touchActive || touchPoints.length < 2 || kickFired) return;
+
+      // Draw the finger trail as a fading line
+      ctx.strokeStyle = 'rgba(255, 178, 122, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(touchPoints[0].x, touchPoints[0].y);
+      for (let i = 1; i < touchPoints.length; i++) {
+        ctx.lineTo(touchPoints[i].x, touchPoints[i].y);
+      }
+      ctx.stroke();
+    }
+
+    function drawHUD() {
+      if (gameState !== 'playing') return;
+
+      // HUD bar background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      roundRect(ctx, 10, 10, GW - 20, 50, 12);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = 'rgba(255, 178, 122, 0.3)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, 10, 10, GW - 20, 50, 12);
+      ctx.stroke();
+
+      // Timer icon + text (left side)
+      ctx.fillStyle = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
+      ctx.font = 'bold 22px Arial';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const timerStr = '⏱ ' + timeLeft + 's';
+      ctx.fillText(timerStr, 28, 36);
+
+      // Score (right side)
+      ctx.fillStyle = '#48A943';
+      ctx.font = 'bold 22px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(score + ' pts', GW - 28, 36);
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y, x + w, y + r, r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x, y + h, x, y + h - r, r);
+      ctx.lineTo(x, y + r);
+      ctx.arcTo(x, y, x + r, y, r);
+      ctx.closePath();
+    }
+
+    // ============================================================
+    // GAME LOOP
+    // ============================================================
+    function loop() {
+      if (gameState === 'playing') {
+        updateBall();
+        updateParticles();
+        updateScorePopups();
+      }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // ============================================================
+    // BUTTON HANDLERS
+    // ============================================================
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('replayBtn').addEventListener('click', startGame);
+
+    // Start render loop
+    spawnTargets();
+    loop();
+  </script>
+</body>
+</html>
