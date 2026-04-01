@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.4</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.5</div>
     </div>
   </div>
 
@@ -908,8 +908,8 @@
       if (!ball.flying) return;
 
       // The back wall of the net — ball hits this before reaching the ground
-      // Sits about 70% of the way from crossbar to horizon (like 10ft behind the goal line)
-      const netWallY = goal.y + goal.height * 0.7;
+      // Net wall pushed deeper — ball needs room to arc up and come down
+      const netWallY = goal.y + goal.height * 0.5;
       // In screen terms, this is a vertical wall at that Y depth
 
       if (ball.phase === 'arc') {
@@ -958,20 +958,18 @@
 
         // ── NET WALL CHECK: ball hit the back of the net? ──
         if (ball.groundY <= netWallY && ball.ballHeight > 0) {
-          // Ball has reached the back of the net while still airborne
           ball.phase = 'bounce';
-          // Bounce off the net wall — good initial bounce energy
-          ball.bounceVY = -9; // strong upward bounce off the net
-          ball.bounceVX = ball.spin * 0.5;
+          ball.bounceVY = -9;
+          // Scatter: spin + random horizontal kick so balls don't all land in same spot
+          ball.bounceVX = ball.spin * 0.5 + (Math.random() - 0.5) * 4;
           ball.bounceGroundY = ball.groundY;
-          // Ball keeps its current height — it bounces off the wall, not the floor
         }
 
         // Arc complete without hitting net (weak kick that drops early)
         if (ball.flightT >= 1.0 && ball.phase === 'arc') {
           ball.phase = 'bounce';
           ball.bounceVY = -2;
-          ball.bounceVX = (ball.targetX - ball.startX) * 0.002;
+          ball.bounceVX = (ball.targetX - ball.startX) * 0.002 + (Math.random() - 0.5) * 3;
           ball.ballHeight = 0;
           ball.bounceGroundY = ball.groundY;
         }
@@ -998,12 +996,13 @@
           ball.bounceCount++;
 
           if (ball.bounceCount >= 5) {
-            // Done bouncing — leave a dead ball in the net and reset
+            // Done bouncing — leave a dead ball exactly where it is on screen
             deadBalls.push({
-              x: ball.groundX,
-              y: ball.bounceGroundY,
+              x: ball.x,
+              y: ball.y,  // actual screen Y, not ground plane
               visualScale: ball.visualScale,
               frame: ballFrame,
+              screenPos: true, // flag: y is screen position, not ground plane
               spawnTime: Date.now(),
             });
             ball.phase = 'done';
@@ -1031,14 +1030,11 @@
       const ballR = ball.radius * ball.visualScale;
 
       // Only check target collisions when the ball is actually at the goal's depth
-      // During arc phase, the ball's groundY must be within the goal area
-      // This prevents hits on the way up when the screen Y overlaps but depth doesn't
       if (ball.phase === 'arc') {
-        // Ball's ground position must be past the goal's top edge (crossbar)
-        // to be at the right depth for target hits
-        if (ball.groundY > goal.y + goal.height * 0.3) return; // not deep enough yet
-        // Also require the ball to be past peak (descending half of arc)
-        if (ball.flightT < 0.5) return;
+        // Ball must be inside the goal area (past the crossbar depth)
+        if (ball.groundY > goal.y) return;
+        // Ball must be well past the peak of its arc (descending)
+        if (ball.flightT < 0.65) return;
       }
 
       for (const t of targets) {
@@ -1055,13 +1051,13 @@
           if (ball.phase === 'arc') {
             ball.phase = 'bounce';
             ball.bounceGroundY = ball.groundY;
-            ball.bounceVY = -5;
+            ball.bounceVY = -3;
             const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
-            ball.bounceVX = Math.cos(hitAngle) * 3;
+            ball.bounceVX = Math.cos(hitAngle) * 2 + (Math.random() - 0.5) * 1.5;
           } else if (ball.phase === 'bounce') {
-            ball.bounceVY = -Math.abs(ball.bounceVY) * 0.6 - 2;
+            ball.bounceVY = -Math.abs(ball.bounceVY) * 0.4 - 1.5;
             const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
-            ball.bounceVX = Math.cos(hitAngle) * 2.5;
+            ball.bounceVX = Math.cos(hitAngle) * 1.5 + (Math.random() - 0.5) * 1;
           }
 
           // Check if all targets are down
@@ -1256,20 +1252,21 @@
         const sx = col * SPRITE_CELL;
         const sy = row * SPRITE_CELL;
 
-        // Shadow sits right at the ground plane (db.y = bounceGroundY)
-        const dbShadowR = drawSize * 0.5;
+        // Shadow right below the ball
+        const shadowR = drawSize * 0.5;
+        const shadowY = db.y + drawSize * 0.33;
         ctx.globalAlpha = alpha * 0.3;
         ctx.fillStyle = 'rgba(0,0,0,1)';
         ctx.beginPath();
-        ctx.ellipse(db.x, db.y, dbShadowR, dbShadowR * 0.25, 0, 0, Math.PI * 2);
+        ctx.ellipse(db.x, shadowY, shadowR, shadowR * 0.2, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Ball sprite — drawn so its bottom sits at the ground plane
+        // Ball sprite — drawn centered on stored screen position
         ctx.globalAlpha = alpha;
         ctx.drawImage(
           ballSheet,
           sx, sy, SPRITE_CELL, SPRITE_CELL,
-          db.x - drawSize / 2, db.y - drawSize * 0.65, drawSize, drawSize
+          db.x - drawSize / 2, db.y - drawSize / 2, drawSize, drawSize
         );
         ctx.globalAlpha = 1;
       }
