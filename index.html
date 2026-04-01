@@ -276,6 +276,10 @@
       flightSpeed: 0,
       arcHeight: 0,
       ballHeight: 0,
+      // Spin — curves the ball left/right during flight
+      spin: 0,            // negative = hooks left, positive = hooks right
+      rotation: 0,        // visual rotation angle in radians
+      rotationSpeed: 0,   // how fast the ball visually spins
       // Bounce state
       phase: 'arc',       // 'arc' | 'bounce' | 'done'
       bounceVY: 0,
@@ -287,22 +291,23 @@
     // Swipe-across tracking
     // Finger swipes ACROSS the ball — kick fires when finger enters the ball zone
     let touchActive = false;
-    let touchPoints = [];  // recent touch positions with timestamps
-    let kickFired = false; // prevent double-kicks per swipe
+    let touchPoints = [];      // recent points for velocity calc
+    let allTouchPoints = [];   // ALL points for trail drawing & curvature
+    let kickFired = false;
 
     // Goal dimensions — mapped to gameplayBG.jpg
     // Image is 1080x1920, game coords are 540x960 (half)
     // Crossbar at ~y530 in image = 265 in game
-    // Goal bottom at ~y980 in image = 490 in game
+    // Goal bottom moved up 50px to 440 in game
     // Left post at ~x155 in image = 77 in game
     // Right post at ~x925 in image = 463 in game
     const goal = {
       x: 77,
       y: 265,
       width: 386,
-      height: 225,
+      height: 175,
       postWidth: 10,
-      netColor: 'rgba(255,255,255,0.0)', // invisible — image has the net
+      netColor: 'rgba(255,255,255,0.0)',
     };
 
     // Targets
@@ -311,17 +316,17 @@
 
     function spawnTargets() {
       targets = [];
-      const padding = 30;
+      const padding = 20;
       const usableW = goal.width - padding * 2;
       const usableH = goal.height - padding * 2;
 
-      // Place 5 targets inside the goal from the background image
+      // Place 5 targets spread across the goal
       const positions = [
-        { x: 0.15, y: 0.25 },  // top-left
-        { x: 0.85, y: 0.25 },  // top-right
-        { x: 0.5, y: 0.2 },    // top-center
-        { x: 0.25, y: 0.7 },   // bottom-left
-        { x: 0.75, y: 0.7 },   // bottom-right
+        { x: 0.08, y: 0.2 },   // top-left (pushed wider)
+        { x: 0.92, y: 0.2 },   // top-right (pushed wider)
+        { x: 0.5, y: 0.15 },   // top-center
+        { x: 0.18, y: 0.78 },  // bottom-left (pushed wider & lower)
+        { x: 0.82, y: 0.78 },  // bottom-right (pushed wider & lower)
       ];
 
       for (let i = 0; i < TARGET_COUNT; i++) {
@@ -329,7 +334,7 @@
         targets.push({
           x: goal.x + padding + usableW * pos.x,
           y: goal.y + padding + usableH * pos.y,
-          radius: 22,
+          radius: 44,
           alive: true,
           hitAnim: 0,
         });
@@ -404,8 +409,11 @@
       touchActive = true;
       kickFired = false;
       touchPoints = [];
+      allTouchPoints = [];
       const pos = getInputPos(e);
-      touchPoints.push({ x: pos.x, y: pos.y, time: Date.now() });
+      const pt = { x: pos.x, y: pos.y, time: Date.now() };
+      touchPoints.push(pt);
+      allTouchPoints.push(pt);
     }
 
     function onMove(e) {
@@ -414,7 +422,9 @@
 
       const pos = getInputPos(e);
       const now = Date.now();
-      touchPoints.push({ x: pos.x, y: pos.y, time: now });
+      const pt = { x: pos.x, y: pos.y, time: now };
+      touchPoints.push(pt);
+      allTouchPoints.push(pt);
 
       // Keep only last ~15 points for velocity calc
       if (touchPoints.length > 15) touchPoints.shift();
@@ -435,7 +445,9 @@
 
         // Must be swiping upward with some speed
         if (swipeDist > 10 && dy < -5 && elapsed > 0) {
-          fireKick(dx, dy, swipeDist, elapsed);
+          // Calculate curvature from all touch points
+          const curvature = calculateCurvature(allTouchPoints);
+          fireKick(dx, dy, swipeDist, elapsed, curvature);
           kickFired = true;
         }
       }
@@ -444,16 +456,49 @@
     function onUp(e) {
       touchActive = false;
       touchPoints = [];
+      allTouchPoints = [];
       kickFired = false;
     }
 
-    function fireKick(dx, dy, swipeDist, elapsed) {
+    // Calculate curvature of the swipe path
+    // Returns negative for left curve, positive for right curve
+    function calculateCurvature(points) {
+      if (points.length < 5) return 0;
+
+      // Sum up the cross products of consecutive segments
+      // This tells us how much the path curves left vs right
+      let totalCross = 0;
+      let totalLength = 0;
+
+      for (let i = 1; i < points.length - 1; i++) {
+        const ax = points[i].x - points[i - 1].x;
+        const ay = points[i].y - points[i - 1].y;
+        const bx = points[i + 1].x - points[i].x;
+        const by = points[i + 1].y - points[i].y;
+
+        // Cross product: positive = turning right, negative = turning left
+        const cross = ax * by - ay * bx;
+        const segLen = Math.sqrt(ax * ax + ay * ay);
+        totalCross += cross;
+        totalLength += segLen;
+      }
+
+      if (totalLength < 10) return 0;
+
+      // Normalize by path length so longer swipes don't auto-spin more
+      return totalCross / totalLength;
+    }
+
+    function fireKick(dx, dy, swipeDist, elapsed, curvature) {
       const power = Math.min(swipeDist / Math.max(elapsed, 0.05) * 0.01, 1.0);
 
-      // Horizontal aim based on swipe dx
-      const aimX = ball.homeX + dx * 3;
+      // Horizontal aim — 30% further than before (dx * 3 → dx * 3.9)
+      const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 40, Math.min(goal.x + goal.width - 40, aimX));
       const horizonY = goal.y + goal.height;
+
+      // Spin from curvature — clamp to reasonable range
+      const spinAmount = Math.max(-3, Math.min(3, curvature * 0.8));
 
       ball.startX = ball.homeX;
       ball.startY = ball.homeY;
@@ -462,12 +507,15 @@
       ball.targetX = clampedX;
       ball.targetY = horizonY;
       ball.flightT = 0;
-      ball.flightSpeed = (0.018 + power * 0.012) * 0.5; // 50% slower
+      ball.flightSpeed = (0.018 + power * 0.012) * 0.5;
       ball.arcHeight = 150 + power * 120;
       ball.ballHeight = 0;
       ball.flying = true;
-      ball.visualScale = ball.restingScale; // starts at 2x
+      ball.visualScale = ball.restingScale;
       ball.phase = 'arc';
+      ball.spin = spinAmount;
+      ball.rotation = 0;
+      ball.rotationSpeed = spinAmount * 0.15;
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
@@ -526,6 +574,9 @@
       ball.flying = false;
       ball.visualScale = ball.restingScale;
       ball.phase = 'arc';
+      ball.spin = 0;
+      ball.rotation = 0;
+      ball.rotationSpeed = 0;
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
@@ -540,9 +591,19 @@
 
         const t = Math.min(ball.flightT, 1.0);
 
-        // Ground position: linear interpolation from start to target
-        ball.groundX = ball.startX + (ball.targetX - ball.startX) * t;
-        ball.groundY = ball.startY + (ball.targetY - ball.startY) * t;
+        // Ground position: linear interpolation + spin curve offset
+        const linearX = ball.startX + (ball.targetX - ball.startX) * t;
+        const linearY = ball.startY + (ball.targetY - ball.startY) * t;
+
+        // Spin curves the ball sideways — peaks in the middle of flight
+        // Uses sin curve so it bends smoothly: 0 at start, max at middle, settles at end
+        const spinOffset = ball.spin * Math.sin(t * Math.PI) * 60;
+
+        ball.groundX = linearX + spinOffset;
+        ball.groundY = linearY;
+
+        // Update visual rotation
+        ball.rotation += ball.rotationSpeed;
 
         // Parabolic height: peaks at t=0.5, zero at t=0 and t=1
         ball.ballHeight = 4 * ball.arcHeight * t * (1 - t);
@@ -581,8 +642,9 @@
         const gravity = 0.35;
 
         ball.bounceVY += gravity;
-        ball.ballHeight -= ball.bounceVY; // ballHeight is "above ground"
-        ball.groundX += ball.bounceVX;
+        ball.ballHeight -= ball.bounceVY;
+        ball.groundX += ball.bounceVX + ball.spin * 0.3; // spin carries into bounce drift
+        ball.rotation += ball.rotationSpeed * 0.5; // slow down rotation
 
         // Hit the ground plane
         if (ball.ballHeight <= 0) {
@@ -733,7 +795,7 @@
 
         // Points label
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px Arial';
+        ctx.font = 'bold 18px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('100', t.x, t.y);
@@ -745,6 +807,10 @@
 
       ctx.save();
       ctx.translate(ball.x, ball.y);
+      // Apply spin rotation
+      if (ball.flying) {
+        ctx.rotate(ball.rotation);
+      }
 
       // Ball shadow (resting)
       if (!ball.flying) {
@@ -836,19 +902,59 @@
     }
 
     function drawSwipeTrail() {
-      if (!touchActive || touchPoints.length < 2 || kickFired) return;
+      if (!touchActive || allTouchPoints.length < 2) return;
 
-      // Draw the finger trail as a fading line
-      ctx.strokeStyle = 'rgba(255, 178, 122, 0.35)';
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(touchPoints[0].x, touchPoints[0].y);
-      for (let i = 1; i < touchPoints.length; i++) {
-        ctx.lineTo(touchPoints[i].x, touchPoints[i].y);
+      const pts = allTouchPoints;
+
+      // Draw the full swipe path — thick, bright, visible
+      // Color shifts from white to orange/green based on curvature direction
+      for (let i = 1; i < pts.length; i++) {
+        const progress = i / pts.length;
+        const alpha = 0.3 + progress * 0.5;
+
+        // Compute local curvature for color
+        let color = `rgba(255, 255, 255, ${alpha})`; // default white
+        if (i > 1 && i < pts.length - 1) {
+          const ax = pts[i].x - pts[i - 1].x;
+          const ay = pts[i].y - pts[i - 1].y;
+          const bx = pts[i + 1].x - pts[i].x;
+          const by = pts[i + 1].y - pts[i].y;
+          const cross = ax * by - ay * bx;
+          if (cross < -2) {
+            color = `rgba(72, 169, 67, ${alpha})`; // green = curving left
+          } else if (cross > 2) {
+            color = `rgba(255, 178, 122, ${alpha})`; // orange = curving right
+          }
+        }
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4 + progress * 3; // gets thicker toward the end
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
       }
-      ctx.stroke();
+
+      // Draw dots at each tracked point
+      for (let i = 0; i < pts.length; i++) {
+        const alpha = 0.2 + (i / pts.length) * 0.6;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(pts[i].x, pts[i].y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // If we have enough curvature info, show a spin indicator near the ball
+      if (!kickFired && pts.length >= 6) {
+        const curv = calculateCurvature(pts);
+        if (Math.abs(curv) > 0.3) {
+          ctx.fillStyle = curv < 0 ? 'rgba(72, 169, 67, 0.7)' : 'rgba(255, 178, 122, 0.7)';
+          ctx.font = 'bold 14px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText(curv < 0 ? '↺ SPIN' : 'SPIN ↻', ball.x, ball.y + ball.radius * ball.visualScale + 25);
+        }
+      }
     }
 
     function drawHUD() {
