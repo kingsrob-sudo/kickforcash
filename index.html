@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.3</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.8</div>
     </div>
   </div>
 
@@ -739,6 +739,8 @@
       const dx = endPt.x - startPt.x;
       const dy = endPt.y - startPt.y;
       const swipeLength = Math.sqrt(dx * dx + dy * dy);
+      const swipeTime = (endPt.time - startPt.time) / 1000; // seconds
+      const swipeSpeed = swipeLength / Math.max(swipeTime, 0.02); // px per second
 
       if (swipeLength < 15 || dy > -5) {
         allTouchPoints = [];
@@ -753,7 +755,7 @@
       // Fire the kick with a tiny delay so player sees the full trail
       kickFired = true;
       setTimeout(() => {
-        fireKick(dx, dy, swipeLength, spinDeviation);
+        fireKick(dx, dy, swipeSpeed, spinDeviation);
       }, 120);
 
       allTouchPoints = [];
@@ -797,8 +799,11 @@
       return avgDeviation * 0.6 + maxDeviation * 0.4;
     }
 
-    function fireKick(dx, dy, swipeLength, spinDeviation) {
-      const power = Math.min(swipeLength / 80, 1.5);
+    function fireKick(dx, dy, swipeSpeed, spinDeviation) {
+      // Power from swipe SPEED (px/sec) — not distance
+      // Slow swipe (~200 px/s) = gentle tap, fast flick (~1500+ px/s) = full power
+      // This gives real dynamic range between soft and hard kicks
+      const power = Math.min(Math.max((swipeSpeed - 150) / 1200, 0.1), 1.5);
 
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
@@ -820,7 +825,7 @@
 
       // Arc (vertical) — initial upward velocity, gravity will pull it down
       ball.arcY = 0;
-      ball.arcVY = -(3.2 + power * 2.8); // 60% lower arc
+      ball.arcVY = -(8 + power * 4);
 
       // State
       ball.flying = true;
@@ -1054,17 +1059,20 @@
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y - 30, 100);
 
-          // Bounce off target surface
+          // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
             ball.phase = 'bounce';
             ball.bounceGroundY = ball.groundScreenY;
-            ball.bounceVY = -3;
-            const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
-            ball.bounceVX = Math.cos(hitAngle) * 2 + (Math.random() - 0.5) * 1.5;
+            // Random angle in a wide spread (mostly sideways/upward)
+            const randomAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.2;
+            const bounceSpeed = 2.5 + Math.random() * 3;
+            ball.bounceVY = Math.sin(randomAngle) * bounceSpeed - 2;
+            ball.bounceVX = Math.cos(randomAngle) * bounceSpeed;
           } else if (ball.phase === 'bounce') {
-            ball.bounceVY = -Math.abs(ball.bounceVY) * 0.4 - 1.5;
-            const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
-            ball.bounceVX = Math.cos(hitAngle) * 1.5 + (Math.random() - 0.5) * 1;
+            const randomAngle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 1.2;
+            const bounceSpeed = 1.5 + Math.random() * 2;
+            ball.bounceVY = Math.sin(randomAngle) * bounceSpeed - 1;
+            ball.bounceVX = Math.cos(randomAngle) * bounceSpeed;
           }
 
           if (targets.every(tt => !tt.alive)) {
