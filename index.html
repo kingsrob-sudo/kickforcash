@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.6</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.7</div>
     </div>
   </div>
 
@@ -997,12 +997,18 @@
 
           if (ball.bounceCount >= 5) {
             // Done bouncing — leave a dead ball exactly where it is on screen
+            // Capture shadow params exactly as the live ball renders them
+            const deadR = ball.radius * ball.visualScale * 1.5;
+            const deadShadowY = ball.bounceGroundY + deadR * 0.65;
             deadBalls.push({
               x: ball.x,
-              y: ball.y,  // actual screen Y, not ground plane
+              y: ball.y,
               visualScale: ball.visualScale,
               frame: ballFrame,
-              screenPos: true, // flag: y is screen position, not ground plane
+              shadowX: ball.groundX,
+              shadowY: deadShadowY,
+              shadowRx: deadR * 0.6,
+              shadowRy: deadR * 0.18,
               spawnTime: Date.now(),
             });
             ball.phase = 'done';
@@ -1252,14 +1258,11 @@
         const sx = col * SPRITE_CELL;
         const sy = row * SPRITE_CELL;
 
-        // Shadow — fixed size, never scales
-        const fixedShadowRx = 12;
-        const fixedShadowRy = 3;
-        const shadowY = db.y + drawSize * 0.33;
+        // Shadow — uses exact same params as live ball shadow at time of settling
         ctx.globalAlpha = alpha * 0.3;
         ctx.fillStyle = 'rgba(0,0,0,1)';
         ctx.beginPath();
-        ctx.ellipse(db.x, shadowY, fixedShadowRx, fixedShadowRy, 0, 0, Math.PI * 2);
+        ctx.ellipse(db.shadowX, db.shadowY, db.shadowRx, db.shadowRy, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Ball sprite — drawn centered on stored screen position
