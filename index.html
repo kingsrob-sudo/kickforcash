@@ -457,79 +457,91 @@
 
       // Persist the trail for display
       swipeTrailDisplay = [...allTouchPoints];
-      swipeTrailFade = 1.0; // will fade out over time
+      swipeTrailFade = 1.0;
 
-      // Calculate curvature from the full path
-      const curvature = calculateCurvature(pts);
+      // ── ANALYZE THE FULL SWIPE ──
 
-      // Use the segment near the ball crossing for direction/power
-      // Find the points around where the finger crossed the ball
-      const ballCrossIdx = findBallCrossIndex(pts);
-      const nearPoints = pts.slice(Math.max(0, ballCrossIdx - 4), Math.min(pts.length, ballCrossIdx + 4));
-      const nearFirst = nearPoints[0];
-      const nearLast = nearPoints[nearPoints.length - 1];
-      const nearDx = nearLast.x - nearFirst.x;
-      const nearDy = nearLast.y - nearFirst.y;
-      const nearDist = Math.sqrt(nearDx * nearDx + nearDy * nearDy);
-      const nearElapsed = (nearLast.time - nearFirst.time) / 1000;
+      // 1) DIRECTION & POWER from start → end point
+      const startPt = pts[0];
+      const endPt = pts[pts.length - 1];
+      const dx = endPt.x - startPt.x;
+      const dy = endPt.y - startPt.y;
+      const swipeLength = Math.sqrt(dx * dx + dy * dy);
+
+      if (swipeLength < 15 || dy > -5) {
+        allTouchPoints = [];
+        return;
+      }
+
+      // 2) SPIN from deviation off the center line
+      //    Measure how far each point strays left/right of the start→end line
+      //    Positive deviation = finger went RIGHT of center → ball curves LEFT
+      const spinDeviation = calculateSpinDeviation(pts);
 
       // Fire the kick with a tiny delay so player sees the full trail
       kickFired = true;
       setTimeout(() => {
-        fireKick(nearDx, nearDy, nearDist, Math.max(nearElapsed, 0.01), curvature);
+        fireKick(dx, dy, swipeLength, spinDeviation);
       }, 120);
 
       allTouchPoints = [];
     }
 
-    // Find the index in the touch points array closest to the ball center
-    function findBallCrossIndex(pts) {
-      let minDist = Infinity;
-      let minIdx = 0;
-      for (let i = 0; i < pts.length; i++) {
-        const d = distTo(pts[i].x, pts[i].y, ball.x, ball.y);
-        if (d < minDist) {
-          minDist = d;
-          minIdx = i;
+    // Measure average signed deviation of swipe path from the center line (start→end)
+    // Positive = finger curved to the RIGHT of center line
+    // Negative = finger curved to the LEFT of center line
+    function calculateSpinDeviation(pts) {
+      if (pts.length < 4) return 0;
+
+      const startPt = pts[0];
+      const endPt = pts[pts.length - 1];
+      const lineDx = endPt.x - startPt.x;
+      const lineDy = endPt.y - startPt.y;
+      const lineLen = Math.sqrt(lineDx * lineDx + lineDy * lineDy);
+
+      if (lineLen < 10) return 0;
+
+      // Unit normal to the center line (perpendicular, pointing right)
+      const nx = -lineDy / lineLen;
+      const ny = lineDx / lineLen;
+
+      // For each point, compute signed distance from the center line
+      let totalDeviation = 0;
+      let maxDeviation = 0;
+
+      for (let i = 1; i < pts.length - 1; i++) {
+        const px = pts[i].x - startPt.x;
+        const py = pts[i].y - startPt.y;
+        // Signed distance: positive = right of line, negative = left
+        const signedDist = px * nx + py * ny;
+        totalDeviation += signedDist;
+        if (Math.abs(signedDist) > Math.abs(maxDeviation)) {
+          maxDeviation = signedDist;
         }
       }
-      return minIdx;
+
+      // Use a blend of average and max deviation for a good feel
+      const avgDeviation = totalDeviation / (pts.length - 2);
+      return avgDeviation * 0.6 + maxDeviation * 0.4;
     }
 
-    // Calculate curvature of the swipe path
-    // Returns negative for left curve, positive for right curve
-    function calculateCurvature(points) {
-      if (points.length < 5) return 0;
+    function fireKick(dx, dy, swipeLength, spinDeviation) {
+      // Power from swipe length — normalize to 0..1 range
+      // A short flick (~50px) = weak, a long swipe (~300px+) = full power
+      const power = Math.min(swipeLength / 250, 1.0);
 
-      let totalCross = 0;
-      let totalLength = 0;
-
-      for (let i = 1; i < points.length - 1; i++) {
-        const ax = points[i].x - points[i - 1].x;
-        const ay = points[i].y - points[i - 1].y;
-        const bx = points[i + 1].x - points[i].x;
-        const by = points[i + 1].y - points[i].y;
-
-        const cross = ax * by - ay * bx;
-        const segLen = Math.sqrt(ax * ax + ay * ay);
-        totalCross += cross;
-        totalLength += segLen;
-      }
-
-      if (totalLength < 10) return 0;
-      return totalCross / totalLength;
-    }
-
-    function fireKick(dx, dy, swipeDist, elapsed, curvature) {
-      const power = Math.min(swipeDist / Math.max(elapsed, 0.05) * 0.01, 1.0);
-
-      // Horizontal aim — 30% further
+      // Direction from the start→end vector angle
+      const angle = Math.atan2(dy, dx);
+      // Convert angle to horizontal aim: how far left/right of center the ball goes
+      // dx drives horizontal aim, scaled by swipe length for longer = more reach
       const aimX = ball.homeX + dx * 3.9;
-      const clampedX = Math.max(goal.x + 40, Math.min(goal.x + goal.width - 40, aimX));
+      const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
       const horizonY = goal.y + goal.height;
 
-      // Spin from curvature
-      const spinAmount = Math.max(-3, Math.min(3, curvature * 0.8));
+      // Spin from deviation — OPPOSITE direction
+      // Finger curved right → ball hooks left (negative spin)
+      // Finger curved left → ball hooks right (positive spin)
+      const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
       ball.startX = ball.homeX;
       ball.startY = ball.homeY;
@@ -538,15 +550,15 @@
       ball.targetX = clampedX;
       ball.targetY = horizonY;
       ball.flightT = 0;
-      ball.flightSpeed = (0.018 + power * 0.012) * 0.5;
-      ball.arcHeight = 150 + power * 120;
+      ball.flightSpeed = (0.012 + power * 0.015) * 0.5;
+      ball.arcHeight = 100 + power * 180; // longer swipe = higher arc
       ball.ballHeight = 0;
       ball.flying = true;
       ball.visualScale = ball.restingScale;
       ball.phase = 'arc';
       ball.spin = spinAmount;
       ball.rotation = 0;
-      ball.rotationSpeed = spinAmount * 0.15;
+      ball.rotationSpeed = spinAmount * 0.12;
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
@@ -631,8 +643,9 @@
         const linearX = ball.startX + (ball.targetX - ball.startX) * t;
         const linearY = ball.startY + (ball.targetY - ball.startY) * t;
 
-        // Spin curves the ball sideways — peaks in the middle of flight
-        const spinOffset = ball.spin * Math.sin(t * Math.PI) * 60;
+        // Spin curves the ball sideways — bends MORE toward the end of flight
+        // t^3 means: barely any curve early, dramatic bend late (banana kick feel)
+        const spinOffset = ball.spin * Math.pow(t, 3) * 120;
 
         ball.groundX = linearX + spinOffset;
         ball.groundY = linearY;
@@ -957,7 +970,6 @@
       } else if (swipeTrailDisplay.length >= 2 && swipeTrailFade > 0) {
         pts = swipeTrailDisplay;
         fadeAlpha = swipeTrailFade;
-        // Fade the persisted trail
         swipeTrailFade -= 0.015;
         if (swipeTrailFade <= 0) {
           swipeTrailDisplay = [];
@@ -966,24 +978,45 @@
 
       if (!pts) return;
 
-      // Draw the full swipe path — thick, bright, color-coded by curvature
+      const startPt = pts[0];
+      const endPt = pts[pts.length - 1];
+
+      // ── Draw the center line (start → end) as a dashed line ──
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.25 * fadeAlpha})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(startPt.x, startPt.y);
+      ctx.lineTo(endPt.x, endPt.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Compute center line normal for deviation coloring
+      const lineDx = endPt.x - startPt.x;
+      const lineDy = endPt.y - startPt.y;
+      const lineLen = Math.sqrt(lineDx * lineDx + lineDy * lineDy);
+      const nx = lineLen > 0 ? -lineDy / lineLen : 0;
+      const ny = lineLen > 0 ? lineDx / lineLen : 0;
+
+      // ── Draw the swipe path, colored by deviation from center line ──
       for (let i = 1; i < pts.length; i++) {
         const progress = i / pts.length;
-        const alpha = (0.3 + progress * 0.5) * fadeAlpha;
+        const alpha = (0.4 + progress * 0.4) * fadeAlpha;
 
-        // Compute local curvature for color
+        // Signed distance from center line: positive = right, negative = left
+        const px = pts[i].x - startPt.x;
+        const py = pts[i].y - startPt.y;
+        const deviation = px * nx + py * ny;
+
         let color = `rgba(255, 255, 255, ${alpha})`;
-        if (i > 1 && i < pts.length - 1) {
-          const ax = pts[i].x - pts[i - 1].x;
-          const ay = pts[i].y - pts[i - 1].y;
-          const bx = pts[i + 1].x - pts[i].x;
-          const by = pts[i + 1].y - pts[i].y;
-          const cross = ax * by - ay * bx;
-          if (cross < -2) {
-            color = `rgba(72, 169, 67, ${alpha})`;
-          } else if (cross > 2) {
-            color = `rgba(255, 178, 122, ${alpha})`;
-          }
+        if (deviation > 5) {
+          // Finger is RIGHT of center → ball will hook LEFT (green)
+          const intensity = Math.min(1, deviation / 40);
+          color = `rgba(${Math.round(72 + 183 * (1 - intensity))}, ${Math.round(169 + 86 * (1 - intensity))}, ${Math.round(67 + 188 * (1 - intensity))}, ${alpha})`;
+        } else if (deviation < -5) {
+          // Finger is LEFT of center → ball will hook RIGHT (orange)
+          const intensity = Math.min(1, -deviation / 40);
+          color = `rgba(${Math.round(255)}, ${Math.round(178 + 77 * (1 - intensity))}, ${Math.round(122 + 133 * (1 - intensity))}, ${alpha})`;
         }
 
         ctx.strokeStyle = color;
@@ -997,34 +1030,35 @@
 
       // Draw dots at each tracked point
       for (let i = 0; i < pts.length; i++) {
-        const alpha = (0.2 + (i / pts.length) * 0.6) * fadeAlpha;
+        const alpha = (0.15 + (i / pts.length) * 0.5) * fadeAlpha;
         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(pts[i].x, pts[i].y, 2.5, 0, Math.PI * 2);
+        ctx.arc(pts[i].x, pts[i].y, 2, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Start dot — big green circle
+      // Start dot
       ctx.fillStyle = `rgba(72, 169, 67, ${0.7 * fadeAlpha})`;
       ctx.beginPath();
-      ctx.arc(pts[0].x, pts[0].y, 6, 0, Math.PI * 2);
+      ctx.arc(startPt.x, startPt.y, 6, 0, Math.PI * 2);
       ctx.fill();
 
-      // End dot — big orange circle
-      const last = pts[pts.length - 1];
+      // End dot
       ctx.fillStyle = `rgba(255, 178, 122, ${0.7 * fadeAlpha})`;
       ctx.beginPath();
-      ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+      ctx.arc(endPt.x, endPt.y, 6, 0, Math.PI * 2);
       ctx.fill();
 
-      // Spin indicator while actively swiping
-      if (touchActive && pts.length >= 6) {
-        const curv = calculateCurvature(pts);
-        if (Math.abs(curv) > 0.3) {
-          ctx.fillStyle = curv < 0 ? 'rgba(72, 169, 67, 0.7)' : 'rgba(255, 178, 122, 0.7)';
+      // Spin indicator
+      if (pts.length >= 6) {
+        const dev = calculateSpinDeviation(pts);
+        if (Math.abs(dev) > 5) {
+          // Positive dev = finger right = ball hooks left, negative = opposite
+          const hookDir = dev > 0 ? '← HOOK' : 'HOOK →';
+          ctx.fillStyle = dev > 0 ? `rgba(72, 169, 67, ${0.7 * fadeAlpha})` : `rgba(255, 178, 122, ${0.7 * fadeAlpha})`;
           ctx.font = 'bold 14px Arial';
           ctx.textAlign = 'center';
-          ctx.fillText(curv < 0 ? '↺ SPIN' : 'SPIN ↻', ball.x, ball.y + ball.radius * ball.visualScale + 25);
+          ctx.fillText(hookDir, ball.x, ball.y + ball.radius * ball.visualScale + 25);
         }
       }
     }
