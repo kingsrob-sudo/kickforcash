@@ -186,7 +186,7 @@
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
-    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.1</div>
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.2</div>
   </div>
 
   <!-- End Screen -->
@@ -287,13 +287,16 @@
     const BALL_RADIUS = 30; // base radius at "normal" size
     const ball = {
       x: GW / 2,          // screen x
-      y: GH - 125,        // screen y
+      y: GH + 80,         // starts off-screen bottom for entrance roll
       radius: BALL_RADIUS,
       homeX: GW / 2,
-      homeY: GH - 125,
+      homeY: GH - 135,    // moved up 10px
       flying: false,
       visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
       restingScale: 2.6,  // the scale when sitting at home
+      // Entrance animation
+      entering: false,
+      enterT: 0,
       // Flight params (set on kick)
       groundX: 0,
       groundY: 0,
@@ -331,13 +334,13 @@
       x: 77,
       y: 265,
       width: 386,
-      height: 175,
+      height: 180,         // lowered ground plane by 5px (was 175)
       postWidth: 10,
       netColor: 'rgba(255,255,255,0.0)',
     };
 
-    // Targets
-    const TARGET_COUNT = 5;
+    // Targets — 3 targets centered in goal, slightly above center to avoid logo
+    const TARGET_COUNT = 3;
     let targets = [];
 
     function spawnTargets() {
@@ -346,12 +349,11 @@
       const usableW = goal.width - padding * 2;
       const usableH = goal.height - padding * 2;
 
+      // 3 targets: left, center, right — vertically at ~40% (above center, clear of logo)
       const positions = [
-        { x: 0.08, y: 0.2 },
-        { x: 0.92, y: 0.2 },
-        { x: 0.5, y: 0.15 },
-        { x: 0.18, y: 0.78 },
-        { x: 0.82, y: 0.78 },
+        { x: 0.15, y: 0.38 },   // left
+        { x: 0.5, y: 0.32 },    // center (slightly higher)
+        { x: 0.85, y: 0.38 },   // right
       ];
 
       for (let i = 0; i < TARGET_COUNT; i++) {
@@ -429,7 +431,7 @@
 
     function onDown(e) {
       e.preventDefault();
-      if (gameState !== 'playing' || ball.flying) return;
+      if (gameState !== 'playing' || ball.flying || ball.entering) return;
 
       touchActive = true;
       kickFired = false;
@@ -604,6 +606,12 @@
       spawnTargets();
       gameState = 'playing';
 
+      // Entrance animation — ball rolls in from bottom
+      ball.entering = true;
+      ball.enterT = 0;
+      ball.y = GH + 80; // start off-screen
+      ball.flying = false;
+
       // Start background video (needs user interaction trigger on mobile)
       bgVideo.play().catch(e => console.log('Video autoplay blocked:', e));
 
@@ -628,7 +636,7 @@
 
     function resetBall() {
       ball.x = ball.homeX;
-      ball.y = ball.homeY;
+      ball.y = GH + 80; // start off-screen for roll-in
       ball.groundX = ball.homeX;
       ball.groundY = ball.homeY;
       ball.flightT = 0;
@@ -642,6 +650,9 @@
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
+      // Trigger entrance animation
+      ball.entering = true;
+      ball.enterT = 0;
     }
 
     function updateBall() {
@@ -693,7 +704,7 @@
           // Ball has reached the back of the net while still airborne
           ball.phase = 'bounce';
           // Bounce off the net wall — good initial bounce energy
-          ball.bounceVY = -6; // strong upward bounce off the net
+          ball.bounceVY = -9; // strong upward bounce off the net
           ball.bounceVX = ball.spin * 0.5;
           ball.bounceGroundY = ball.groundY;
           // Ball keeps its current height — it bounces off the wall, not the floor
@@ -743,9 +754,9 @@
             return;
           }
 
-          // Bounce back up — bouncier! (0.55 restitution instead of 0.4)
-          ball.bounceVY = ball.bounceVY * -0.55;
-          ball.bounceVX *= 0.7;
+          // Bounce back up — very bouncy!
+          ball.bounceVY = ball.bounceVY * -0.65;
+          ball.bounceVX *= 0.75;
         }
 
         // Screen position — stays at the net wall depth
@@ -946,7 +957,7 @@
       // The sprite is drawn centered on ball.x, ball.y so shadow goes below
       const shadowR = drawSize * 0.35;
       if (!ball.flying) {
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.beginPath();
         ctx.ellipse(ball.x, ball.y + drawSize * 0.42, shadowR, shadowR * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -1160,6 +1171,26 @@
     // ============================================================
     function loop() {
       if (gameState === 'playing') {
+        // Entrance animation — ball rolls up from bottom
+        if (ball.entering) {
+          ball.enterT += 0.035;
+          if (ball.enterT >= 1) {
+            ball.enterT = 1;
+            ball.entering = false;
+            ball.y = ball.homeY;
+          } else {
+            // Ease-out: fast start, gentle settle
+            const eased = 1 - Math.pow(1 - ball.enterT, 3);
+            const startY = GH + 80;
+            ball.y = startY + (ball.homeY - startY) * eased;
+            // Roll the sprite frames during entrance
+            ballFrameAccum += 0.8;
+            if (ballFrameAccum >= 1) {
+              ballFrame = (ballFrame + 1) % SPRITE_TOTAL;
+              ballFrameAccum = 0;
+            }
+          }
+        }
         updateBall();
         updateParticles();
         updateScorePopups();
