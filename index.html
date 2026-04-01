@@ -186,6 +186,7 @@
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
+    <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v0.8</div>
   </div>
 
   <!-- End Screen -->
@@ -865,11 +866,13 @@
 
     function drawBall() {
       const r = ball.radius * ball.visualScale;
-      const drawSize = r * 2;
+      // The sprite ball is ~69% of its cell (88px in 128px), so we scale up
+      // to match the intended radius, then 2x larger as requested
+      const spriteScale = 2.0;
+      const drawSize = r * 2 * spriteScale;
 
       // Advance sprite frame based on spin speed
       if (ball.flying && ball.rotationSpeed !== 0) {
-        // Step through frames based on spin — faster spin = faster frame cycling
         ballFrameAccum += Math.abs(ball.rotationSpeed) * 2.5;
         if (ballFrameAccum >= 1) {
           const steps = Math.floor(ballFrameAccum);
@@ -882,11 +885,13 @@
         }
       }
 
-      // Ball shadow (resting)
+      // Ball shadow — positioned at ball center bottom
+      // The sprite is drawn centered on ball.x, ball.y so shadow goes below
+      const shadowR = drawSize * 0.35;
       if (!ball.flying) {
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.beginPath();
-        ctx.ellipse(ball.x + 4, ball.y + r + 5, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(ball.x, ball.y + drawSize * 0.42, shadowR, shadowR * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -899,11 +904,10 @@
 
         ctx.drawImage(
           ballSheet,
-          sx, sy, SPRITE_CELL, SPRITE_CELL,  // source rect
-          ball.x - drawSize / 2, ball.y - drawSize / 2, drawSize, drawSize  // dest rect
+          sx, sy, SPRITE_CELL, SPRITE_CELL,
+          ball.x - drawSize / 2, ball.y - drawSize / 2, drawSize, drawSize
         );
       } else {
-        // Fallback: simple circle while loading
         ctx.fillStyle = '#ddd';
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
@@ -912,7 +916,7 @@
 
       // Swipe-across hint when not flying
       if (!ball.flying && gameState === 'playing') {
-        const hintY = ball.y - r - 20;
+        const hintY = ball.y - drawSize / 2 - 15;
         ctx.globalAlpha = 0.3 + Math.sin(Date.now() * 0.004) * 0.15;
         ctx.fillStyle = '#FFB27A';
         ctx.beginPath();
