@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.2</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.3</div>
     </div>
   </div>
 
@@ -815,7 +815,7 @@
       ball.targetX = clampedX;
       ball.targetY = horizonY;
       ball.flightT = 0;
-      ball.flightSpeed = (0.016 + power * 0.02) * 0.5; // faster overall
+      ball.flightSpeed = (0.008 + power * 0.01) * 0.5; // much slower flight
       ball.arcHeight = 100 + power * 180;
       ball.ballHeight = 0;
       ball.flying = true;
@@ -1225,8 +1225,7 @@
       const now = Date.now();
 
       for (const db of deadBalls) {
-        const age = (now - db.spawnTime) / 1000; // seconds
-        // Fade out in the last 2 seconds
+        const age = (now - db.spawnTime) / 1000;
         let alpha = 1.0;
         if (age > 8) {
           alpha = 1 - (age - 8) / 2;
@@ -1242,6 +1241,18 @@
         const sx = col * SPRITE_CELL;
         const sy = row * SPRITE_CELL;
 
+        // Shadow for dead ball — well below at far scale
+        const dbNormScale = db.visualScale / ball.restingScale;
+        const dbShadowR = drawSize * 0.35;
+        const dbShadowGap = 5 + (1 - dbNormScale) * 35;
+        const dbShadowY = db.y + drawSize * 0.33 + dbShadowGap;
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.fillStyle = 'rgba(0,0,0,1)';
+        ctx.beginPath();
+        ctx.ellipse(db.x, dbShadowY, dbShadowR, dbShadowR * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ball sprite
         ctx.globalAlpha = alpha;
         ctx.drawImage(
           ballSheet,
