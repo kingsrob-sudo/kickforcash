@@ -456,26 +456,12 @@
         return;
       }
 
-      // Analyze the FULL swipe path
-      const pts = allTouchPoints;
-      const first = pts[0];
-      const last = pts[pts.length - 1];
-      const dx = last.x - first.x;
-      const dy = last.y - first.y;
-      const totalDist = Math.sqrt(dx * dx + dy * dy);
-      const totalElapsed = (last.time - first.time) / 1000;
-
-      // Must be swiping upward with some distance
-      if (totalDist < 15 || dy > -5 || totalElapsed <= 0) {
-        allTouchPoints = [];
-        return;
-      }
-
       // Persist the trail for display
       swipeTrailDisplay = [...allTouchPoints];
       swipeTrailFade = 1.0;
 
       // ── ANALYZE THE FULL SWIPE ──
+      const pts = allTouchPoints;
 
       // 1) DIRECTION & POWER from start → end point
       const startPt = pts[0];
