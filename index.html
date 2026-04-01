@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v1.9</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.0</div>
     </div>
   </div>
 
@@ -1028,6 +1028,17 @@
     function checkTargetCollisions() {
       const ballR = ball.radius * ball.visualScale;
 
+      // Only check target collisions when the ball is actually at the goal's depth
+      // During arc phase, the ball's groundY must be within the goal area
+      // This prevents hits on the way up when the screen Y overlaps but depth doesn't
+      if (ball.phase === 'arc') {
+        // Ball's ground position must be past the goal's top edge (crossbar)
+        // to be at the right depth for target hits
+        if (ball.groundY > goal.y + goal.height * 0.3) return; // not deep enough yet
+        // Also require the ball to be past peak (descending half of arc)
+        if (ball.flightT < 0.5) return;
+      }
+
       for (const t of targets) {
         if (!t.alive) continue;
         const d = distTo(ball.x, ball.y, t.x, t.y);
@@ -1039,17 +1050,13 @@
           spawnScorePopup(t.x, t.y - 30, 100);
 
           // ── BOUNCE OFF TARGET SURFACE ──
-          // If still in arc phase, transition to bounce with deflection
           if (ball.phase === 'arc') {
             ball.phase = 'bounce';
             ball.bounceGroundY = ball.groundY;
-            // Reflect roughly — bounce back toward the player
             ball.bounceVY = -5;
-            // Horizontal deflection based on which side of the target we hit
             const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
             ball.bounceVX = Math.cos(hitAngle) * 3;
           } else if (ball.phase === 'bounce') {
-            // Already bouncing — deflect off the target
             ball.bounceVY = -Math.abs(ball.bounceVY) * 0.6 - 2;
             const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
             ball.bounceVX = Math.cos(hitAngle) * 2.5;
