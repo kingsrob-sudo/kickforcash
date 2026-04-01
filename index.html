@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.0</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v3.1</div>
     </div>
   </div>
 
@@ -538,38 +538,41 @@
     const BALL_RADIUS = 30; // base radius at "normal" size
     const ball = {
       x: GW / 2,          // screen x
-      y: GH + 80,         // starts off-screen bottom for entrance roll
+      y: GH + 80,         // screen y (starts off-screen for entrance)
       radius: BALL_RADIUS,
       homeX: GW / 2 + 1,
-      homeY: GH - 170,    // up 10px more
+      homeY: GH - 170,
       flying: false,
-      visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
-      restingScale: 2.6,  // the scale when sitting at home
+      visualScale: 2.6,
+      restingScale: 2.6,
       // Entrance animation
       entering: false,
       enterT: 0,
-      // Flight params (set on kick)
-      groundX: 0,
-      groundY: 0,
+      // ── NEW PHYSICS FLIGHT MODEL ──
+      // Depth: how far down the field (0 = at player, maxDepth = at goal)
+      depth: 0,
+      depthSpeed: 0,       // how fast depth advances per frame
+      maxDepth: 0,         // total depth to travel
+      // Arc: pure Y-axis physics (up/down)
+      arcY: 0,             // height above ground (0 = on ground)
+      arcVY: 0,            // vertical velocity (negative = up, positive = down)
+      // X position
       startX: 0,
-      startY: 0,
       targetX: 0,
-      targetY: 0,
-      visibleHorizonY: 0, // used for perspective shrink only
-      flightT: 0,
-      flightSpeed: 0,
-      arcHeight: 0,
-      ballHeight: 0,
-      // Spin — curves the ball left/right during flight
-      spin: 0,            // negative = hooks left, positive = hooks right
-      rotation: 0,        // visual rotation angle in radians
-      rotationSpeed: 0,   // how fast the ball visually spins
+      // Spin
+      spin: 0,
+      rotation: 0,
+      rotationSpeed: 0,
+      // Ground plane references
+      groundScreenY: 0,    // where the ground is on screen at current depth
+      visibleHorizonY: 0,  // the goal bottom on screen
       // Bounce state
-      phase: 'arc',       // 'arc' | 'bounce' | 'done'
+      phase: 'flight',     // 'flight' | 'bounce' | 'done'
       bounceVY: 0,
       bounceCount: 0,
-      bounceGroundY: 0,
+      bounceGroundY: 0,    // screen Y of ground where bouncing happens
       bounceVX: 0,
+      groundX: 0,          // used by shadow and dead balls
     };
 
     // Swipe-across tracking
@@ -795,38 +798,42 @@
     }
 
     function fireKick(dx, dy, swipeLength, spinDeviation) {
-      // Power from swipe length
       const power = Math.min(swipeLength / 80, 1.5);
 
-      const angle = Math.atan2(dy, dx);
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
-      const horizonY = goal.y + goal.height; // visible goal bottom (~448)
-      const extendedTargetY = horizonY - 400;  // flight path extends 400 units further back
+      const horizonY = goal.y + goal.height;
+
+      // Total depth the ball must travel (player to extended goal depth)
+      const totalDepth = (ball.homeY - horizonY) + 400;
 
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
       ball.startX = ball.homeX;
-      ball.startY = ball.homeY;
-      ball.groundX = ball.homeX;
-      ball.groundY = ball.homeY;
       ball.targetX = clampedX;
-      ball.targetY = extendedTargetY;   // ball aims much further back
-      ball.visibleHorizonY = horizonY;  // used for perspective shrink only
-      ball.flightT = 0;
-      ball.flightSpeed = (0.005 + power * 0.007) * 0.5;
-      ball.arcHeight = 250 + power * 300; // big arc — ball needs to visibly rise and fall
-      ball.ballHeight = 0;
+      ball.visibleHorizonY = horizonY;
+
+      // Depth (forward travel)
+      ball.depth = 0;
+      ball.maxDepth = totalDepth;
+      ball.depthSpeed = 1.5 + power * 2.5; // pixels of depth per frame
+
+      // Arc (vertical) — initial upward velocity, gravity will pull it down
+      ball.arcY = 0;
+      ball.arcVY = -(8 + power * 7); // negative = upward kick
+
+      // State
       ball.flying = true;
+      ball.phase = 'flight';
       ball.visualScale = ball.restingScale;
-      ball.phase = 'arc';
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
-      ball.bounceGroundY = horizonY; // bounces still happen at the visible ground
+      ball.bounceGroundY = horizonY;
+      ball.groundX = ball.homeX;
     }
 
     // ============================================================
@@ -836,27 +843,29 @@
       score = 0;
       timeLeft = 60;
       ball.x = ball.homeX;
-      ball.y = ball.homeY;
+      ball.y = GH + 80;
       ball.groundX = ball.homeX;
-      ball.groundY = ball.homeY;
-      ball.flightT = 0;
-      ball.ballHeight = 0;
+      ball.depth = 0;
+      ball.arcY = 0;
+      ball.arcVY = 0;
       ball.flying = false;
       ball.visualScale = ball.restingScale;
-      ball.phase = 'arc';
+      ball.phase = 'flight';
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
+      ball.spin = 0;
+      ball.rotation = 0;
+      ball.rotationSpeed = 0;
       particles = [];
       scorePopups = [];
       deadBalls = [];
       spawnTargets();
       gameState = 'playing';
 
-      // Entrance animation — ball rolls in from bottom
+      // Entrance animation
       ball.entering = true;
       ball.enterT = 0;
-      ball.y = GH + 80; // start off-screen
       ball.flying = false;
 
       // Start background video (needs user interaction trigger on mobile)
@@ -884,21 +893,20 @@
 
     function resetBall() {
       ball.x = ball.homeX;
-      ball.y = GH + 80; // start off-screen for roll-in
+      ball.y = GH + 80;
+      ball.depth = 0;
+      ball.arcY = 0;
+      ball.arcVY = 0;
       ball.groundX = ball.homeX;
-      ball.groundY = ball.homeY;
-      ball.flightT = 0;
-      ball.ballHeight = 0;
       ball.flying = false;
       ball.visualScale = ball.restingScale;
-      ball.phase = 'arc';
+      ball.phase = 'flight';
       ball.spin = 0;
       ball.rotation = 0;
       ball.rotationSpeed = 0;
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
-      // Trigger entrance animation
       ball.entering = true;
       ball.enterT = 0;
     }
@@ -906,99 +914,98 @@
     function updateBall() {
       if (!ball.flying) return;
 
-      // The back wall of the net — ball hits this before reaching the ground
-      // Net wall pushed deeper — ball needs room to arc up and come down
-      const netWallY = goal.y + goal.height * 0.5;
-      // In screen terms, this is a vertical wall at that Y depth
+      // Net wall depth — where the back of the net catches the ball
+      const netWallDepth = ball.maxDepth * 0.65;
+      // Visible horizon depth — the depth at which the ball reaches the goal visually
+      const visibleDepth = ball.homeY - ball.visibleHorizonY;
 
-      if (ball.phase === 'arc') {
-        // ── ARC PHASE: parametric parabola from player to horizon ──
-        // Decelerate: ball slows as it travels further
-        const decel = 1 - ball.flightT * 0.5;
-        ball.flightT += ball.flightSpeed * Math.max(decel, 0.35);
+      if (ball.phase === 'flight') {
+        // ── FLIGHT PHASE: separate X depth and Y arc ──
 
-        const t = Math.min(ball.flightT, 1.0);
+        // Advance depth (forward travel toward goal) with slight deceleration
+        const decel = Math.max(0.5, 1 - (ball.depth / ball.maxDepth) * 0.4);
+        ball.depth += ball.depthSpeed * decel;
 
-        // Ground position: linear with t (no ease-out, let decel handle slowing)
-        const linearX = ball.startX + (ball.targetX - ball.startX) * t;
-        const linearY = ball.startY + (ball.targetY - ball.startY) * t;
+        // Arc physics: gravity pulls arcVY positive (downward)
+        const gravity = 0.32;
+        ball.arcVY += gravity;
+        ball.arcY += ball.arcVY;  // arcY: negative = above ground, 0 = ground level
 
-        // Spin curves the ball sideways — bends MORE toward the end of flight
-        // t^3 means: barely any curve early, dramatic bend late (banana kick feel)
-        const spinOffset = ball.spin * Math.pow(t, 3) * 120;
+        // Depth progress (0 = at player, 1 = at visible horizon)
+        const depthProgress = Math.min(1, ball.depth / visibleDepth);
 
-        ball.groundX = linearX + spinOffset;
-        ball.groundY = linearY;
-
-        // Update visual rotation
-        ball.rotation += ball.rotationSpeed;
-
-        // Parabolic height: peaks at t=0.5, zero at t=0 and t=1
-        ball.ballHeight = 4 * ball.arcHeight * t * (1 - t);
-
-        // Screen position: ground position minus height (up is negative Y)
-        ball.x = ball.groundX;
-        ball.y = ball.groundY - ball.ballHeight;
-
-        // Perspective shrink based on visible goal depth, not extended flight target
-        const depthProgress = Math.max(0, Math.min(1, (ball.homeY - ball.groundY) / (ball.homeY - ball.visibleHorizonY)));
+        // Perspective shrink with ease-out
         const easedDepth = 1 - Math.pow(1 - depthProgress, 2.5);
         const farScale = 0.45;
         ball.visualScale = ball.restingScale - easedDepth * (ball.restingScale - farScale);
 
-        // Check collisions during flight
-        checkTargetCollisions();
+        // Screen X: interpolate from start to target based on depth + spin
+        const spinProgress = Math.pow(depthProgress, 3); // spin bends late
+        const spinOffset = ball.spin * spinProgress * 120;
+        ball.groundX = ball.startX + (ball.targetX - ball.startX) * depthProgress + spinOffset;
 
-        // Check post/crossbar collisions
+        // Screen Y for the ground plane at this depth
+        // At depth 0, ground is at homeY. At visibleDepth, ground is at visibleHorizonY.
+        ball.groundScreenY = ball.homeY - (ball.homeY - ball.visibleHorizonY) * depthProgress;
+
+        // Final screen position: ground position + arc offset
+        // arcY starts at 0, goes negative (up), then comes back positive (down)
+        ball.x = ball.groundX;
+        ball.y = ball.groundScreenY + ball.arcY;
+
+        // Update visual rotation
+        ball.rotation += ball.rotationSpeed;
+
+        // ── COLLISION CHECKS ──
+        checkTargetCollisions();
         checkPostCollisions();
 
-        // ── NET WALL CHECK: ball hit the back of the net? ──
-        if (ball.groundY <= netWallY && ball.ballHeight > 0) {
+        // ── NET WALL: ball reached back of net? ──
+        if (ball.depth >= netWallDepth) {
           ball.phase = 'bounce';
-          ball.bounceVY = -9;
-          // Scatter: spin + random horizontal kick so balls don't all land in same spot
+          ball.bounceVY = -6;
           ball.bounceVX = ball.spin * 0.5 + (Math.random() - 0.5) * 4;
-          ball.bounceGroundY = ball.groundY;
+          ball.bounceGroundY = ball.groundScreenY;
+          // Preserve current arc height as bounce height
+          ball.arcY = Math.min(ball.arcY, 0); // make sure it's above ground or at ground
         }
 
-        // Arc complete without hitting net (weak kick that drops early)
-        if (ball.flightT >= 1.0 && ball.phase === 'arc') {
+        // ── BALL HIT THE GROUND (arcY >= 0 means at or below ground level) ──
+        if (ball.arcY >= 0 && ball.arcVY > 0 && ball.depth > 10) {
+          ball.arcY = 0;
           ball.phase = 'bounce';
-          ball.bounceVY = -2;
-          ball.bounceVX = (ball.targetX - ball.startX) * 0.002 + (Math.random() - 0.5) * 3;
-          ball.ballHeight = 0;
-          ball.bounceGroundY = ball.groundY;
+          ball.bounceVY = -Math.abs(ball.arcVY) * 0.5;
+          ball.bounceVX = (Math.random() - 0.5) * 3;
+          ball.bounceGroundY = ball.groundScreenY;
         }
 
         // Ball went off screen sideways
         if (ball.x < -50 || ball.x > GW + 50) {
           ball.phase = 'done';
-          setTimeout(resetBall, 100);
-          ball.flying = false;
+          resetBall();
         }
 
       } else if (ball.phase === 'bounce') {
-        // ── BOUNCE PHASE: ball hit the net wall, now bouncing down ──
+        // ── BOUNCE PHASE: gravity-driven bounces at the ground plane ──
         const gravity = 0.5;
 
         ball.bounceVY += gravity;
-        ball.ballHeight -= ball.bounceVY;
+        ball.arcY += ball.bounceVY;
         ball.groundX += ball.bounceVX;
         ball.rotation += ball.rotationSpeed * 0.5;
 
-        // Ball drops to the net floor
-        if (ball.ballHeight <= 0) {
-          ball.ballHeight = 0;
+        // Hit the ground
+        if (ball.arcY >= 0) {
+          ball.arcY = 0;
           ball.bounceCount++;
 
           if (ball.bounceCount >= 5) {
-            // Done bouncing — leave a dead ball exactly where it is on screen
-            // Capture shadow params exactly as the live ball renders them
+            // Dead ball — capture exact screen position and shadow
             const deadR = ball.radius * ball.visualScale * 1.5;
             const deadShadowY = ball.bounceGroundY + deadR * 0.65;
             deadBalls.push({
-              x: ball.x,
-              y: ball.y,
+              x: ball.groundX,
+              y: ball.bounceGroundY + ball.arcY,
               visualScale: ball.visualScale,
               frame: ballFrame,
               shadowX: ball.groundX,
@@ -1012,16 +1019,14 @@
             return;
           }
 
-          // Bounce back up — very bouncy!
           ball.bounceVY = ball.bounceVY * -0.65;
           ball.bounceVX *= 0.75;
         }
 
-        // Screen position — stays at the net wall depth
+        // Screen position
         ball.x = ball.groundX;
-        ball.y = ball.bounceGroundY - ball.ballHeight;
+        ball.y = ball.bounceGroundY + ball.arcY;
 
-        // Check collisions during bounces
         checkTargetCollisions();
         checkPostCollisions();
         checkSideWallCollisions();
@@ -1030,13 +1035,14 @@
 
     function checkTargetCollisions() {
       const ballR = ball.radius * ball.visualScale;
+      const visibleDepth = ball.homeY - ball.visibleHorizonY;
 
-      // Only check target collisions when the ball is actually at the goal's depth
-      if (ball.phase === 'arc') {
-        // Ball must be inside the goal area (past the crossbar depth)
-        if (ball.groundY > goal.y) return;
-        // Ball must be well past the peak of its arc (descending)
-        if (ball.flightT < 0.65) return;
+      // Only check target collisions when ball is at goal depth and descending
+      if (ball.phase === 'flight') {
+        // Must have reached at least 60% of visible depth
+        if (ball.depth < visibleDepth * 0.6) return;
+        // Must be descending (arcVY > 0 means falling)
+        if (ball.arcVY < 0) return;
       }
 
       for (const t of targets) {
@@ -1049,10 +1055,10 @@
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y - 30, 100);
 
-          // ── BOUNCE OFF TARGET SURFACE ──
-          if (ball.phase === 'arc') {
+          // Bounce off target surface
+          if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundY;
+            ball.bounceGroundY = ball.groundScreenY;
             ball.bounceVY = -3;
             const hitAngle = Math.atan2(ball.y - t.y, ball.x - t.x);
             ball.bounceVX = Math.cos(hitAngle) * 2 + (Math.random() - 0.5) * 1.5;
@@ -1062,7 +1068,6 @@
             ball.bounceVX = Math.cos(hitAngle) * 1.5 + (Math.random() - 0.5) * 1;
           }
 
-          // Check if all targets are down
           if (targets.every(tt => !tt.alive)) {
             setTimeout(() => {
               if (gameState === 'playing') spawnTargets();
@@ -1081,17 +1086,16 @@
       const crossbarBottom = goal.y + goal.postWidth;
       const goalBottom = goal.y + goal.height;
 
-      // Only check when ball is in the goal region vertically
       if (ball.y > crossbarBottom - ballR && ball.y < goalBottom + ballR) {
 
         // ── LEFT POST ──
         if (ball.x - ballR < postLeft && ball.x + ballR > goal.x &&
             ball.y > goal.y - ballR && ball.y < goalBottom) {
-          if (ball.phase === 'arc') {
+          if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundY;
+            ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
             ball.bounceVY = -4;
-            ball.bounceVX = 3; // deflect right
+            ball.bounceVX = 3;
             ball.groundX = postLeft + ballR + 1;
             spawnParticles(postLeft, ball.y);
           } else if (ball.phase === 'bounce') {
@@ -1104,11 +1108,11 @@
         // ── RIGHT POST ──
         if (ball.x + ballR > postRight && ball.x - ballR < goal.x + goal.width &&
             ball.y > goal.y - ballR && ball.y < goalBottom) {
-          if (ball.phase === 'arc') {
+          if (ball.phase === 'flight') {
             ball.phase = 'bounce';
-            ball.bounceGroundY = ball.groundY;
+            ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
             ball.bounceVY = -4;
-            ball.bounceVX = -3; // deflect left
+            ball.bounceVX = -3;
             ball.groundX = postRight - ballR - 1;
             spawnParticles(postRight, ball.y);
           } else if (ball.phase === 'bounce') {
@@ -1122,10 +1126,10 @@
       // ── CROSSBAR ──
       if (ball.y - ballR < crossbarBottom && ball.y + ballR > goal.y &&
           ball.x > postLeft && ball.x < postRight) {
-        if (ball.phase === 'arc' && ball.ballHeight > 0) {
+        if (ball.phase === 'flight' && ball.arcY < 0) {
           ball.phase = 'bounce';
-          ball.bounceGroundY = ball.groundY;
-          ball.bounceVY = 3; // deflect downward
+          ball.bounceGroundY = ball.groundScreenY || ball.bounceGroundY;
+          ball.bounceVY = 3;
           ball.bounceVX = ball.spin * 0.5;
           spawnParticles(ball.x, crossbarBottom);
         }
@@ -1209,22 +1213,17 @@
       if (!ball.flying) return;
 
       const shadowScale = ball.visualScale;
-      const r = ball.radius * shadowScale * 1.5; // match sprite scale
-      // The sprite has padding, so visual bottom of ball is about r*0.65 below center
+      const r = ball.radius * shadowScale * 1.5;
       const visualBottomOffset = r * 0.65;
 
-      if (ball.phase === 'arc') {
-        // During arc, shadow sits on ground plane
-        // ball.y = groundY - ballHeight, so groundY is below the ball — correct
-        const shadowAlpha = 0.3 * (1 - ball.flightT * 0.3);
+      if (ball.phase === 'flight') {
+        // Shadow on the ground plane at current depth
+        const shadowAlpha = 0.3;
         ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
         ctx.beginPath();
-        ctx.ellipse(ball.groundX, ball.groundY, r * 0.6, r * 0.18, 0, 0, Math.PI * 2);
+        ctx.ellipse(ball.groundX, ball.groundScreenY, r * 0.6, r * 0.18, 0, 0, Math.PI * 2);
         ctx.fill();
       } else if (ball.phase === 'bounce') {
-        // During bounce, ball.y = bounceGroundY - ballHeight
-        // Shadow should be at the visual bottom of the ball when grounded,
-        // and stay at that fixed ground level as ball bounces above it
         const shadowY = ball.bounceGroundY + visualBottomOffset;
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
