@@ -66,20 +66,20 @@
     }
 
     .reg-logo {
-      width: 80%;
-      max-width: 280px;
+      width: 65%;
+      max-width: 220px;
       height: auto;
-      margin: 0 auto 1rem;
+      margin: 0 auto 0.5rem;
       display: block;
     }
 
     .start-title {
-      font-size: 2.8rem;
+      font-size: 2.2rem;
       font-weight: 900;
       color: #fff;
       text-align: center;
       line-height: 1.05;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.3rem;
       text-transform: uppercase;
     }
 
@@ -90,21 +90,21 @@
 
     .start-title span {
       color: #FFB27A;
-      font-size: 1.6rem;
+      font-size: 1.3rem;
       font-weight: 700;
       letter-spacing: 3px;
     }
 
     .start-subtitle {
-      font-size: 1rem;
+      font-size: 0.9rem;
       color: rgba(255,255,255,0.6);
-      margin-bottom: 3rem;
+      margin-bottom: 1.5rem;
       text-align: center;
     }
 
     .start-btn {
-      padding: 1.2rem 4rem;
-      font-size: 1.4rem;
+      padding: 1rem 3rem;
+      font-size: 1.2rem;
       font-weight: bold;
       background: #48A943;
       color: #fff;
@@ -220,7 +220,7 @@
     /* Registration Screen */
     #registerScreen {
       background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
-      padding: 2rem 1.5rem;
+      padding: 1rem 1.5rem;
       overflow-y: auto;
     }
 
@@ -231,20 +231,20 @@
     }
 
     .reg-subtitle {
-      font-size: 1.1rem;
+      font-size: 0.9rem;
       color: rgba(255,255,255,0.7);
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
     }
 
     .reg-input {
       width: 100%;
-      padding: 1rem 1rem 1rem 3rem;
-      font-size: 1.1rem;
+      padding: 0.8rem 0.8rem 0.8rem 2.8rem;
+      font-size: 1rem;
       border: 2px solid #FFB27A;
       border-radius: 10px;
       background: rgba(255, 178, 122, 0.1);
       color: #fff;
-      margin-bottom: 1rem;
+      margin-bottom: 0.7rem;
       text-align: left;
       background-repeat: no-repeat;
       background-position: 0.8rem center;
@@ -271,27 +271,27 @@
 
     .checkbox-group {
       text-align: left;
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
     }
 
     .checkbox-item {
       display: flex;
       align-items: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.6rem;
       cursor: pointer;
     }
 
     .checkbox-item input[type="checkbox"] {
-      width: 24px;
-      height: 24px;
-      min-width: 24px;
-      margin-right: 12px;
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      margin-right: 10px;
       cursor: pointer;
       accent-color: #48A943;
     }
 
     .checkbox-item label {
-      font-size: 1rem;
+      font-size: 0.85rem;
       cursor: pointer;
       flex: 1;
     }
@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.0</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.1</div>
     </div>
   </div>
 
@@ -541,7 +541,7 @@
       y: GH + 80,         // starts off-screen bottom for entrance roll
       radius: BALL_RADIUS,
       homeX: GW / 2 + 1,
-      homeY: GH - 160,    // up 15px more
+      homeY: GH - 170,    // up 10px more
       flying: false,
       visualScale: 2.6,   // starts at 2.6x, shrinks to ~0.45x in flight
       restingScale: 2.6,  // the scale when sitting at home
@@ -794,21 +794,17 @@
     }
 
     function fireKick(dx, dy, swipeLength, spinDeviation) {
-      // Power from swipe length — normalize to 0..1 range
-      // A short flick (~50px) = weak, a long swipe (~300px+) = full power
-      const power = Math.min(swipeLength / 250, 1.0);
+      // Power from swipe length — lower threshold so short flicks still reach the goal
+      // A quick flick (~40px) = decent power, long swipe (~150px+) = full power
+      const power = Math.min(swipeLength / 120, 1.0);
 
       // Direction from the start→end vector angle
       const angle = Math.atan2(dy, dx);
-      // Convert angle to horizontal aim: how far left/right of center the ball goes
-      // dx drives horizontal aim, scaled by swipe length for longer = more reach
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
       const horizonY = goal.y + goal.height;
 
       // Spin from deviation — OPPOSITE direction
-      // Finger curved right → ball hooks left (negative spin)
-      // Finger curved left → ball hooks right (positive spin)
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
       ball.startX = ball.homeX;
@@ -818,8 +814,8 @@
       ball.targetX = clampedX;
       ball.targetY = horizonY;
       ball.flightT = 0;
-      ball.flightSpeed = (0.012 + power * 0.015) * 0.5;
-      ball.arcHeight = 100 + power * 180; // longer swipe = higher arc
+      ball.flightSpeed = (0.015 + power * 0.018) * 0.5; // faster flight
+      ball.arcHeight = 120 + power * 160;
       ball.ballHeight = 0;
       ball.flying = true;
       ball.visualScale = ball.restingScale;
@@ -1314,13 +1310,20 @@
         }
       }
 
-      // Ball shadow — positioned at ball center bottom
-      // The sprite is drawn centered on ball.x, ball.y so shadow goes below
+      // Ball shadow — offset scales with ball size
+      // At resting scale (2.6), shadow should be snug below the ball
+      // At far scale (0.45), shadow should be further below proportionally
       const shadowR = drawSize * 0.35;
-      if (!ball.flying) {
+      // The ball sprite has ~15% padding in its cell, so the visual bottom
+      // of the ball is about 0.35 * drawSize below center
+      // Scale the gap between ball bottom and shadow based on visual scale
+      const normalizedScale = ball.visualScale / ball.restingScale; // 1.0 at rest, ~0.17 at far
+      const shadowGap = 5 + (1 - normalizedScale) * 15; // small gap at rest, bigger gap when small
+      const shadowYOffset = drawSize * 0.33 + shadowGap;
+      if (!ball.flying && !ball.entering) {
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.beginPath();
-        ctx.ellipse(ball.x, ball.y + drawSize * 0.42, shadowR, shadowR * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(ball.x, ball.y + shadowYOffset, shadowR, shadowR * 0.3, 0, 0, Math.PI * 2);
         ctx.fill();
       }
 
