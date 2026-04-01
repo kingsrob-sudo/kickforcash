@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.3</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.4</div>
     </div>
   </div>
 
@@ -1208,14 +1208,29 @@
     }
 
     function drawBallShadow() {
-      // Ground-plane shadow during flight — gives depth cue
-      if (ball.flying) {
-        const shadowScale = ball.visualScale;
-        const r = ball.radius * shadowScale;
-        const shadowAlpha = 0.3 * (1 - ball.flightT * 0.5);
+      if (!ball.flying) return;
+
+      const shadowScale = ball.visualScale;
+      const r = ball.radius * shadowScale * 1.5; // match sprite scale
+      // The sprite has padding, so visual bottom of ball is about r*0.65 below center
+      const visualBottomOffset = r * 0.65;
+
+      if (ball.phase === 'arc') {
+        // During arc, shadow sits on ground plane
+        // ball.y = groundY - ballHeight, so groundY is below the ball — correct
+        const shadowAlpha = 0.3 * (1 - ball.flightT * 0.3);
         ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
         ctx.beginPath();
-        ctx.ellipse(ball.groundX, ball.groundY, r * 0.9, r * 0.25, 0, 0, Math.PI * 2);
+        ctx.ellipse(ball.groundX, ball.groundY, r * 0.6, r * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (ball.phase === 'bounce') {
+        // During bounce, ball.y = bounceGroundY - ballHeight
+        // Shadow should be at the visual bottom of the ball when grounded,
+        // and stay at that fixed ground level as ball bounces above it
+        const shadowY = ball.bounceGroundY + visualBottomOffset;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(ball.groundX, shadowY, r * 0.6, r * 0.18, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1241,23 +1256,20 @@
         const sx = col * SPRITE_CELL;
         const sy = row * SPRITE_CELL;
 
-        // Shadow for dead ball — well below at far scale
-        const dbNormScale = db.visualScale / ball.restingScale;
-        const dbShadowR = drawSize * 0.35;
-        const dbShadowGap = 5 + (1 - dbNormScale) * 35;
-        const dbShadowY = db.y + drawSize * 0.33 + dbShadowGap;
-        ctx.globalAlpha = alpha * 0.35;
+        // Shadow sits right at the ground plane (db.y = bounceGroundY)
+        const dbShadowR = drawSize * 0.5;
+        ctx.globalAlpha = alpha * 0.3;
         ctx.fillStyle = 'rgba(0,0,0,1)';
         ctx.beginPath();
-        ctx.ellipse(db.x, dbShadowY, dbShadowR, dbShadowR * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(db.x, db.y, dbShadowR, dbShadowR * 0.25, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Ball sprite
+        // Ball sprite — drawn so its bottom sits at the ground plane
         ctx.globalAlpha = alpha;
         ctx.drawImage(
           ballSheet,
           sx, sy, SPRITE_CELL, SPRITE_CELL,
-          db.x - drawSize / 2, db.y - drawSize / 2, drawSize, drawSize
+          db.x - drawSize / 2, db.y - drawSize * 0.65, drawSize, drawSize
         );
         ctx.globalAlpha = 1;
       }
