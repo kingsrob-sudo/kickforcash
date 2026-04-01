@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.5</div>
+      <div style="margin-top: 1.5rem; font-size: 0.7rem; color: rgba(255,255,255,0.2); letter-spacing: 1px;">v2.6</div>
     </div>
   </div>
 
@@ -1252,13 +1252,14 @@
         const sx = col * SPRITE_CELL;
         const sy = row * SPRITE_CELL;
 
-        // Shadow right below the ball
-        const shadowR = drawSize * 0.5;
+        // Shadow — fixed size, never scales
+        const fixedShadowRx = 12;
+        const fixedShadowRy = 3;
         const shadowY = db.y + drawSize * 0.33;
         ctx.globalAlpha = alpha * 0.3;
         ctx.fillStyle = 'rgba(0,0,0,1)';
         ctx.beginPath();
-        ctx.ellipse(db.x, shadowY, shadowR, shadowR * 0.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(db.x, shadowY, fixedShadowRx, fixedShadowRy, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Ball sprite — drawn centered on stored screen position
