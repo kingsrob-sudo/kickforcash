@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Georgia Lottery - Kick to Score</title>
+  <title>Georgia Lottery - Kick for Cash</title>
   <style>
     * {
       margin: 0;
@@ -365,7 +365,7 @@
   <div id="registerScreen" class="screen active">
     <div class="reg-content">
       <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
-      <div class="start-title"><em>Kick</em><br><span>to</span><br><em>Score</em></div>
+      <div class="start-title"><em>Kick</em><br><span>for</span><br><em>Cash</em></div>
       <div class="reg-subtitle">Enter your info to play and win!</div>
 
       <input 
@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.5</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.7</div>
     </div>
   </div>
 
@@ -411,11 +411,11 @@
     <div class="modal-content">
       <div class="modal-header">Terms and Conditions</div>
       <div class="modal-body">
-        <p><strong>Georgia Lottery Soccer Kick Game - Official Rules</strong></p>
+        <p><strong>Georgia Lottery Kick for Cash Game - Official Rules</strong></p>
         <br>
         <p><strong>1. Eligibility:</strong> Participants must be 18 years of age or older. Employees of the Georgia Lottery Corporation and their immediate family members are not eligible to participate.</p>
         <br>
-        <p><strong>2. How to Play:</strong> Scan the QR code, enter your email address and phone number, then play the Soccer Kick game. Swipe to kick soccer balls at targets within 60 seconds.</p>
+        <p><strong>2. How to Play:</strong> Scan the QR code, enter your email address and phone number, then play the Kick for Cash game. Swipe to kick soccer balls at targets within 60 seconds.</p>
         <br>
         <p><strong>3. Prize Drawing:</strong> All participants who complete the game will be entered into the prize drawing. Winners will be selected and notified via the contact information provided.</p>
         <br>
@@ -434,7 +434,7 @@
   <!-- Start Screen (post-registration) -->
   <div id="startScreen">
     <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
-    <div class="start-title"><em>Kick</em><br><span>to</span><br><em>Score</em></div>
+    <div class="start-title"><em>Kick</em><br><span>for</span><br><em>Cash</em></div>
     <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
@@ -605,7 +605,6 @@
       const usableW = goal.width - padding * 2;
       const usableH = goal.height - padding * 2;
 
-      // 3 targets: left, center, right — vertically at ~40% (above center, clear of logo)
       const positions = [
         { x: 0.15, y: 0.38 },   // left
         { x: 0.5, y: 0.32 },    // center (slightly higher)
@@ -620,6 +619,10 @@
           radius: 44,
           alive: true,
           hitAnim: 0,
+          // Entrance: each target drops in from above with staggered timing
+          enterT: 0,
+          enterDelay: i * 0.15,  // stagger: 0, 0.15, 0.3 seconds
+          enterStartY: goal.y - 60, // start above the crossbar
         });
       }
     }
@@ -1235,7 +1238,6 @@
       drawBackground();
       drawBallShadow();
       drawDeadBalls();
-      drawDebugGoalBounds();
       drawTargets();
       drawParticles();
       drawBall();
@@ -1255,78 +1257,6 @@
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
       }
-    }
-
-    function drawDebugGoalBounds() {
-      if (gameState !== 'playing') return;
-      ctx.lineWidth = 1.5;
-
-      // Goal outer box (full goal area)
-      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.strokeRect(goal.x, goal.y, goal.width, goal.height);
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText('GOAL BOX', goal.x + 2, goal.y - 3);
-
-      // Left post inner edge
-      const postLeft = goal.x + goal.postWidth;
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.7)';
-      ctx.beginPath();
-      ctx.moveTo(postLeft, goal.y);
-      ctx.lineTo(postLeft, goal.y + goal.height);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
-      ctx.fillText('L POST', postLeft + 2, goal.y + 12);
-
-      // Right post inner edge
-      const postRight = goal.x + goal.width - goal.postWidth;
-      ctx.beginPath();
-      ctx.moveTo(postRight, goal.y);
-      ctx.lineTo(postRight, goal.y + goal.height);
-      ctx.stroke();
-      ctx.textAlign = 'right';
-      ctx.fillText('R POST', postRight - 2, goal.y + 12);
-
-      // Crossbar bottom
-      const crossbarBottom = goal.y + goal.postWidth;
-      ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
-      ctx.beginPath();
-      ctx.moveTo(goal.x, crossbarBottom);
-      ctx.lineTo(goal.x + goal.width, crossbarBottom);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
-      ctx.textAlign = 'left';
-      ctx.fillText('CROSSBAR', goal.x + 2, crossbarBottom + 12);
-
-      // Goal bottom (horizon / ground plane)
-      ctx.strokeStyle = 'rgba(0, 255, 0, 0.7)';
-      ctx.beginPath();
-      ctx.moveTo(goal.x, goal.y + goal.height);
-      ctx.lineTo(goal.x + goal.width, goal.y + goal.height);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
-      ctx.fillText('GROUND PLANE', goal.x + 2, goal.y + goal.height - 3);
-
-      // Side walls inside net (extended 30px outward from posts)
-      const sideWallLeft = postLeft - 30;
-      const sideWallRight = postRight + 30;
-      ctx.strokeStyle = 'rgba(255, 128, 0, 0.6)';
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(sideWallLeft, goal.y);
-      ctx.lineTo(sideWallLeft, goal.y + goal.height);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(sideWallRight, goal.y);
-      ctx.lineTo(sideWallRight, goal.y + goal.height);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255, 128, 0, 0.6)';
-      ctx.textAlign = 'left';
-      ctx.fillText('L SIDE WALL', sideWallLeft + 2, goal.y + 24);
-      ctx.textAlign = 'right';
-      ctx.fillText('R SIDE WALL', sideWallRight - 2, goal.y + 24);
     }
 
     function drawBallShadow() {
@@ -1393,9 +1323,10 @@
     }
 
     function drawTargets() {
-      for (const t of targets) {
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
         if (!t.alive) {
-          // Hit animation: fade out
+          // Hit animation: fade out + expand
           if (t.hitAnim > 0) {
             t.hitAnim -= 0.05;
             ctx.globalAlpha = t.hitAnim;
@@ -1408,30 +1339,60 @@
           continue;
         }
 
+        // ── ENTRANCE ANIMATION ──
+        // Staggered delay per target, then elastic drop-in from above
+        const rawT = Math.max(0, t.enterT - t.enterDelay) / (1 - t.enterDelay);
+        const progress = Math.min(Math.max(rawT, 0), 1);
+
+        if (progress <= 0) continue; // not started yet
+
+        // Elastic ease-out: overshoots then settles
+        let elastic;
+        if (progress < 1) {
+          const p = progress;
+          elastic = 1 - Math.pow(2, -10 * p) * Math.cos(p * Math.PI * 3);
+        } else {
+          elastic = 1;
+        }
+
+        // Y position: drops from enterStartY to t.y
+        const drawY = t.enterStartY + (t.y - t.enterStartY) * elastic;
+        // Scale: starts small, pops to full size
+        const scaleAnim = 0.3 + 0.7 * Math.min(progress * 1.5, 1);
+        const drawRadius = t.radius * scaleAnim;
+        // Alpha: fades in quickly
+        const alpha = Math.min(progress * 3, 1);
+
+        ctx.globalAlpha = alpha;
+
         // Target outer ring
         ctx.fillStyle = '#FFB27A';
         ctx.beginPath();
-        ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+        ctx.arc(t.x, drawY, drawRadius, 0, Math.PI * 2);
         ctx.fill();
 
         // Target inner ring
         ctx.fillStyle = '#4D200B';
         ctx.beginPath();
-        ctx.arc(t.x, t.y, t.radius * 0.7, 0, Math.PI * 2);
+        ctx.arc(t.x, drawY, drawRadius * 0.7, 0, Math.PI * 2);
         ctx.fill();
 
         // Target bullseye
         ctx.fillStyle = '#48A943';
         ctx.beginPath();
-        ctx.arc(t.x, t.y, t.radius * 0.35, 0, Math.PI * 2);
+        ctx.arc(t.x, drawY, drawRadius * 0.35, 0, Math.PI * 2);
         ctx.fill();
 
         // Points label
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 18px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('100', t.x, t.y);
+        if (scaleAnim > 0.8) {
+          ctx.fillStyle = '#fff';
+          ctx.font = `bold ${Math.round(18 * scaleAnim)}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('100', t.x, drawY);
+        }
+
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -1702,7 +1663,14 @@
         updateBall();
         updateParticles();
         updateScorePopups();
-        // Remove dead balls older than 10 seconds
+        // Update target entrance animations
+        for (const t of targets) {
+          if (t.enterT < 1) {
+            t.enterT += 0.04; // ~25 frames to fully enter
+            if (t.enterT > 1) t.enterT = 1;
+          }
+        }
+        // Remove dead balls older than 4 seconds
         const now = Date.now();
         deadBalls = deadBalls.filter(db => now - db.spawnTime < 4000);
       }
