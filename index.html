@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.7</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.9</div>
     </div>
   </div>
 
@@ -645,14 +645,40 @@
       }
     }
 
-    // Score popup
+    // Score popup — 3-phase animation:
+    // 1) Zoom from target to top-center screen
+    // 2) Hold at top-center for 500ms
+    // 3) Fly to score box in top-right, add score on arrival
     let scorePopups = [];
 
-    function spawnScorePopup(x, y, points) {
+    // Score box position (top-right pill center) for the fly-to target
+    const SCORE_BOX_X = GW - 72;
+    const SCORE_BOX_Y = 36;
+
+    function spawnScorePopup(startX, startY, points) {
+      const holdX = GW / 2;
+      const holdY = 110; // just below the HUD bar
+
       scorePopups.push({
-        x, y,
+        // Phase tracking
+        phase: 'zoom',    // 'zoom' | 'hold' | 'fly' | 'done'
+        timer: 0,
+
+        // Positions
+        startX, startY,   // where it spawned (target position)
+        holdX, holdY,     // top-center hold position
+        endX: SCORE_BOX_X, endY: SCORE_BOX_Y, // score box position
+
+        // Current render position
+        x: startX,
+        y: startY,
+
+        // Data
+        points: points,
         text: '+' + points,
-        life: 1.0,
+        scale: 0.5,
+        alpha: 1,
+        scored: false,     // has the score been added yet?
       });
     }
 
@@ -1090,9 +1116,9 @@
           // 100 points at center, 30 at edge, linear interpolation
           const points = Math.round(100 - accuracy * 70);
 
-          score += points;
+          score += 0; // score added when popup reaches the score box
           spawnParticles(t.x, t.y);
-          spawnScorePopup(t.x, t.y - 30, points);
+          spawnScorePopup(t.x, t.y, points);
 
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
@@ -1221,10 +1247,62 @@
 
     function updateScorePopups() {
       for (const s of scorePopups) {
-        s.y -= 1.5;
-        s.life -= 0.02;
+        s.timer++;
+
+        if (s.phase === 'zoom') {
+          // Phase 1: Fly from target to top-center (20 frames = ~333ms)
+          const duration = 20;
+          const t = Math.min(s.timer / duration, 1);
+          // Ease-out
+          const eased = 1 - Math.pow(1 - t, 3);
+          s.x = s.startX + (s.holdX - s.startX) * eased;
+          s.y = s.startY + (s.holdY - s.startY) * eased;
+          s.scale = 0.5 + eased * 1.0; // grows from 0.5 to 1.5
+          s.alpha = Math.min(t * 3, 1);
+
+          if (t >= 1) {
+            s.phase = 'hold';
+            s.timer = 0;
+          }
+
+        } else if (s.phase === 'hold') {
+          // Phase 2: Hold at top-center for 500ms (~30 frames)
+          s.x = s.holdX;
+          s.y = s.holdY;
+          s.scale = 1.5;
+          s.alpha = 1;
+
+          if (s.timer >= 30) {
+            s.phase = 'fly';
+            s.timer = 0;
+          }
+
+        } else if (s.phase === 'fly') {
+          // Phase 3: Fly to score box (15 frames = ~250ms)
+          const duration = 15;
+          const t = Math.min(s.timer / duration, 1);
+          // Ease-in: accelerates toward the box
+          const eased = t * t;
+          s.x = s.holdX + (s.endX - s.holdX) * eased;
+          s.y = s.holdY + (s.endY - s.holdY) * eased;
+          s.scale = 1.5 - eased * 1.0; // shrinks from 1.5 to 0.5
+          s.alpha = 1 - eased * 0.5;
+
+          if (t >= 1 && !s.scored) {
+            // Add score when it arrives
+            score += s.points;
+            s.scored = true;
+            s.phase = 'done';
+            s.timer = 0;
+          }
+
+        } else if (s.phase === 'done') {
+          // Brief flash then remove
+          s.alpha -= 0.15;
+        }
       }
-      scorePopups = scorePopups.filter(s => s.life > 0);
+
+      scorePopups = scorePopups.filter(s => s.phase !== 'done' || s.alpha > 0);
     }
 
     // ============================================================
@@ -1479,14 +1557,27 @@
 
     function drawScorePopups() {
       for (const s of scorePopups) {
-        ctx.globalAlpha = s.life;
-        ctx.fillStyle = '#48A943';
-        ctx.font = 'bold 28px Arial';
+        if (s.alpha <= 0) continue;
+
+        ctx.globalAlpha = s.alpha;
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.scale(s.scale, s.scale);
+
+        // Glow/shadow behind text
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.font = 'bold 30px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(s.text, s.x, s.y);
+        ctx.fillText(s.text, 2, 2);
+
+        // Main text
+        ctx.fillStyle = s.points >= 80 ? '#FFD700' : s.points >= 50 ? '#48A943' : '#FFB27A';
+        ctx.fillText(s.text, 0, 0);
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
     }
 
     function drawSwipeTrail() {
@@ -1595,30 +1686,115 @@
     function drawHUD() {
       if (gameState !== 'playing') return;
 
-      // HUD bar background
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      roundRect(ctx, 10, 10, GW - 20, 50, 12);
-      ctx.fill();
+      const barH = 72;
+      const barY = 0;
+      const barX = 0;
+      const barW = GW;
 
-      // Border
-      ctx.strokeStyle = 'rgba(255, 178, 122, 0.3)';
+      // ── Main bar background: dark gradient with sport stripe ──
+      const barGrad = ctx.createLinearGradient(0, barY, 0, barY + barH);
+      barGrad.addColorStop(0, 'rgba(20, 12, 5, 0.95)');
+      barGrad.addColorStop(0.6, 'rgba(40, 20, 8, 0.92)');
+      barGrad.addColorStop(1, 'rgba(20, 12, 5, 0.9)');
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(barX, barY, barW, barH);
+
+      // Green accent stripe at bottom
+      const stripeGrad = ctx.createLinearGradient(0, barY + barH - 4, 0, barY + barH);
+      stripeGrad.addColorStop(0, '#48A943');
+      stripeGrad.addColorStop(1, '#2d7a2d');
+      ctx.fillStyle = stripeGrad;
+      ctx.fillRect(barX, barY + barH - 4, barW, 4);
+
+      // Thin orange line above the green
+      ctx.fillStyle = '#FFB27A';
+      ctx.fillRect(barX, barY + barH - 5, barW, 1);
+
+      // ── Timer section (left) ──
+      // Timer background pill
+      const timerPillX = 12;
+      const timerPillY = 12;
+      const timerPillW = 120;
+      const timerPillH = 48;
+      ctx.fillStyle = timeLeft <= 10 ? 'rgba(255, 40, 40, 0.25)' : 'rgba(255, 178, 122, 0.1)';
+      roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
+      ctx.fill();
+      ctx.strokeStyle = timeLeft <= 10 ? 'rgba(255, 60, 60, 0.6)' : 'rgba(255, 178, 122, 0.25)';
       ctx.lineWidth = 1;
-      roundRect(ctx, 10, 10, GW - 20, 50, 12);
+      roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
       ctx.stroke();
 
-      // Timer icon + text (left side)
-      ctx.fillStyle = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
-      ctx.font = 'bold 22px Arial';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const timerStr = '⏱ ' + timeLeft + 's';
-      ctx.fillText(timerStr, 28, 36);
+      // Timer label
+      ctx.fillStyle = 'rgba(255, 178, 122, 0.6)';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('TIME', timerPillX + timerPillW / 2, timerPillY + 5);
 
-      // Score (right side)
+      // Timer value
+      ctx.fillStyle = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
+      ctx.font = 'bold 28px Arial';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(timeLeft + 's', timerPillX + timerPillW / 2, timerPillY + timerPillH - 4);
+
+      // Pulse effect when low time
+      if (timeLeft <= 10 && timeLeft > 0) {
+        const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.3;
+        ctx.fillStyle = `rgba(255, 40, 40, ${pulse})`;
+        roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
+        ctx.fill();
+      }
+
+      // ── Score section (right) ──
+      const scorePillX = GW - 132;
+      const scorePillY = 12;
+      const scorePillW = 120;
+      const scorePillH = 48;
+      ctx.fillStyle = 'rgba(72, 169, 67, 0.12)';
+      roundRect(ctx, scorePillX, scorePillY, scorePillW, scorePillH, 10);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(72, 169, 67, 0.3)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, scorePillX, scorePillY, scorePillW, scorePillH, 10);
+      ctx.stroke();
+
+      // Score label
+      ctx.fillStyle = 'rgba(72, 169, 67, 0.6)';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('SCORE', scorePillX + scorePillW / 2, scorePillY + 5);
+
+      // Score value
       ctx.fillStyle = '#48A943';
-      ctx.font = 'bold 22px Arial';
-      ctx.textAlign = 'right';
-      ctx.fillText(score + ' pts', GW - 28, 36);
+      ctx.font = 'bold 28px Arial';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(score, scorePillX + scorePillW / 2, scorePillY + scorePillH - 4);
+
+      // ── Center: Game title ──
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('KICK FOR CASH', GW / 2, 16);
+
+      // Soccer ball icon (small circle)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.beginPath();
+      ctx.arc(GW / 2, 46, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        const px = GW / 2 + Math.cos(a) * 4;
+        const py = 46 + Math.sin(a) * 4;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
     }
 
     function roundRect(ctx, x, y, w, h, r) {
