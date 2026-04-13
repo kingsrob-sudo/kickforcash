@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v4.9</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v5.3</div>
     </div>
   </div>
 
@@ -941,6 +941,13 @@
       clearInterval(timerInterval);
       document.getElementById('finalScore').textContent = score;
       document.getElementById('endScreen').classList.add('active');
+
+      // POST game result to Games sheet
+      postToGames({
+        user_id: userId,
+        email: userEmail,
+        score: score,
+      });
     }
 
     function resetBall() {
@@ -989,7 +996,7 @@
 
         // Perspective shrink with ease-out
         const easedDepth = 1 - Math.pow(1 - depthProgress, 2.5);
-        const farScale = 0.45;
+        const farScale = 0.36; // 20% smaller at the goal than before
         ball.visualScale = ball.restingScale - easedDepth * (ball.restingScale - farScale);
 
         // Screen X: interpolate from start to target based on depth + spin
@@ -1855,8 +1862,52 @@
     }
 
     // ============================================================
+    // BACKEND — Two separate Google Sheets via Apps Script
+    // ============================================================
+    // TODO: Replace with your deployed Apps Script URLs
+    const SHEETS_USERS_URL = 'https://script.google.com/macros/s/AKfycbyqs01na8JNHP1-sqZsluR_sjlDe26xUXHK4n5zGLaqWSrm3pUnFz3e1GtzmcKrk_2GMg/exec';
+    const SHEETS_GAMES_URL = 'https://script.google.com/macros/s/AKfycbyA4FfUNgOBKg-nJyRW1RciU1A5QyN7r8dzgeZ-1gq-i2xMijw_W_W_mkP0i2-05KiS3A/exec';
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function postToUsers(data) {
+      if (SHEETS_USERS_URL === 'YOUR_USERS_SCRIPT_URL_HERE') {
+        console.log('Users API not configured. Would POST:', data);
+        return;
+      }
+      data.api_key = 'glc-k4c-xR7m2pQ9vL4n';
+      fetch(SHEETS_USERS_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch(err => console.error('Users POST error:', err));
+    }
+
+    function postToGames(data) {
+      if (SHEETS_GAMES_URL === 'YOUR_GAMES_SCRIPT_URL_HERE') {
+        console.log('Games API not configured. Would POST:', data);
+        return;
+      }
+      data.api_key = 'glc-k4c-xR7m2pQ9vL4n';
+      fetch(SHEETS_GAMES_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch(err => console.error('Games POST error:', err));
+    }
+
+    // ============================================================
     // REGISTRATION
     // ============================================================
+    let userId = '';
     let userEmail = '';
     let userPhone = '';
     let userMarketingConsent = false;
@@ -1898,6 +1949,17 @@
       userEmail = emailInput.value.trim();
       userPhone = phoneInput.value.trim();
       userMarketingConsent = marketingCheck.checked;
+      userId = generateUUID();
+
+      // POST registration to Users sheet
+      postToUsers({
+        user_id: userId,
+        email: userEmail,
+        phone: userPhone,
+        marketing_consent: userMarketingConsent,
+        age_verified: ageCheck.checked,
+        terms_accepted: termsCheck.checked,
+      });
 
       // Hide registration, skip play screen, go straight to game
       document.getElementById('registerScreen').classList.remove('active');
