@@ -402,7 +402,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v5.3</div>
+      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v5.5</div>
     </div>
   </div>
 
@@ -1877,31 +1877,25 @@
     }
 
     function postToUsers(data) {
-      if (SHEETS_USERS_URL === 'YOUR_USERS_SCRIPT_URL_HERE') {
-        console.log('Users API not configured. Would POST:', data);
-        return;
-      }
       data.api_key = 'glc-k4c-xR7m2pQ9vL4n';
       fetch(SHEETS_USERS_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(data),
-      }).catch(err => console.error('Users POST error:', err));
+      }).then(() => console.log('Users POST sent'))
+        .catch(err => console.error('Users POST error:', err));
     }
 
     function postToGames(data) {
-      if (SHEETS_GAMES_URL === 'YOUR_GAMES_SCRIPT_URL_HERE') {
-        console.log('Games API not configured. Would POST:', data);
-        return;
-      }
       data.api_key = 'glc-k4c-xR7m2pQ9vL4n';
       fetch(SHEETS_GAMES_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(data),
-      }).catch(err => console.error('Games POST error:', err));
+      }).then(() => console.log('Games POST sent'))
+        .catch(err => console.error('Games POST error:', err));
     }
 
     // ============================================================
