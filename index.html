@@ -314,23 +314,13 @@
       display: flex;
     }
 
-    /* Registration Screen — full viewport to cover canvas behind */
+    /* Registration Screen */
     #registerScreen {
       background: url('mainBG.jpg') center top / cover no-repeat;
       background-color: #0d1b2a;
       padding: 0 1.5rem 1rem;
       overflow-y: auto;
       justify-content: flex-end;
-      /* Override .screen constraints — must cover entire viewport */
-      left: 0;
-      top: 0;
-      transform: none;
-      max-width: 100%;
-      max-height: 100%;
-      width: 100%;
-      height: 100%;
-      border-radius: 0;
-      box-shadow: none;
     }
 
     .reg-content {
@@ -470,7 +460,7 @@
 </head>
 <body>
 
-  <canvas id="gameCanvas"></canvas>
+  <canvas id="gameCanvas" style="display:none;"></canvas>
 
   <!-- Registration Screen -->
   <div id="registerScreen" class="screen active">
@@ -511,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.2</div>
     </div>
   </div>
 
@@ -1038,13 +1028,13 @@
       spawnTargets();
       gameState = 'playing';
 
+      // Show the canvas
+      canvas.style.display = 'block';
+
       // Entrance animation
       ball.entering = true;
       ball.enterT = 0;
       ball.flying = false;
-
-      // Start background video (needs user interaction trigger on mobile)
-      bgVideo.play().catch(e => console.log('Video autoplay blocked:', e));
 
       document.getElementById('startScreen').classList.remove('active');
       document.getElementById('startScreen').classList.add('hidden');
@@ -1464,9 +1454,7 @@
     }
 
     function drawBackground() {
-      if (bgVideoReady && !bgVideo.paused) {
-        ctx.drawImage(bgVideo, 0, 0, GW, GH);
-      } else if (bgLoaded) {
+      if (bgLoaded) {
         ctx.drawImage(bgImage, 0, 0, GW, GH);
       } else {
         ctx.fillStyle = '#1a3a1a';
