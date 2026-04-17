@@ -16,7 +16,7 @@
 
     body {
       font-family: 'Arial', sans-serif;
-      background: #000;
+      background: #0d1b2a;
       color: #fff;
       overflow: hidden;
       touch-action: none;
@@ -38,11 +38,13 @@
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
+      background: url('mainBG.jpg') center top / cover no-repeat;
+      background-color: #0d1b2a;
       display: none;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-end;
+      padding-bottom: 3rem;
       z-index: 100;
       transition: opacity 0.4s ease;
     }
@@ -139,7 +141,8 @@
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
-      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
+      background: url('mainBG.jpg') center top / cover no-repeat;
+      background-color: #0d1b2a;
       display: none;
       flex-direction: column;
       align-items: center;
@@ -219,9 +222,11 @@
 
     /* Registration Screen */
     #registerScreen {
-      background: linear-gradient(135deg, #4D200B 0%, #1a0a03 100%);
-      padding: 1rem 1.5rem;
+      background: url('mainBG.jpg') center top / cover no-repeat;
+      background-color: #0d1b2a;
+      padding: 0 1.5rem 1rem;
       overflow-y: auto;
+      justify-content: flex-end;
     }
 
     .reg-content {
@@ -231,20 +236,21 @@
     }
 
     .reg-subtitle {
-      font-size: 0.9rem;
-      color: rgba(255,255,255,0.7);
-      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 0.8rem;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
     }
 
     .reg-input {
       width: 100%;
       padding: 0.8rem 0.8rem 0.8rem 2.8rem;
       font-size: 1rem;
-      border: 2px solid #FFB27A;
+      border: 2px solid rgba(150, 100, 50, 0.6);
       border-radius: 10px;
-      background: rgba(255, 178, 122, 0.1);
+      background: rgba(30, 20, 10, 0.65);
       color: #fff;
-      margin-bottom: 0.7rem;
+      margin-bottom: 0.6rem;
       text-align: left;
       background-repeat: no-repeat;
       background-position: 0.8rem center;
@@ -260,40 +266,41 @@
     }
 
     .reg-input::placeholder {
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.45);
     }
 
     .reg-input:focus {
       outline: none;
-      background-color: rgba(255, 178, 122, 0.15);
-      border-color: #FFB27A;
+      background-color: rgba(30, 20, 10, 0.8);
+      border-color: #48A943;
     }
 
     .checkbox-group {
       text-align: left;
-      margin-bottom: 1rem;
+      margin-bottom: 0.8rem;
     }
 
     .checkbox-item {
       display: flex;
       align-items: center;
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.5rem;
       cursor: pointer;
     }
 
     .checkbox-item input[type="checkbox"] {
-      width: 22px;
-      height: 22px;
-      min-width: 22px;
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
       margin-right: 10px;
       cursor: pointer;
       accent-color: #48A943;
     }
 
     .checkbox-item label {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       cursor: pointer;
       flex: 1;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
 
     .checkbox-item a {
@@ -320,7 +327,7 @@
     }
 
     .modal-content {
-      background: #4D200B;
+      background: #0d1b2a;
       padding: 2rem;
       border-radius: 15px;
       max-width: 600px;
@@ -364,8 +371,6 @@
   <!-- Registration Screen -->
   <div id="registerScreen" class="screen active">
     <div class="reg-content">
-      <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
-      <div class="start-title"><em>Kick</em><br><span>for</span><br><em>Cash</em></div>
       <div class="reg-subtitle">Enter your info to play and win!</div>
 
       <input 
@@ -402,7 +407,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 1.5rem; font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.6); letter-spacing: 1px;">v5.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v5.6</div>
     </div>
   </div>
 
@@ -433,9 +438,7 @@
 
   <!-- Start Screen (post-registration) -->
   <div id="startScreen">
-    <img src="logoClean.png" alt="Georgia Lottery" class="reg-logo">
-    <div class="start-title"><em>Kick</em><br><span>for</span><br><em>Cash</em></div>
-    <div class="start-subtitle">Flick the ball. Hit the targets. Win big.</div>
+    <div class="start-subtitle" style="text-shadow: 0 2px 6px rgba(0,0,0,0.7);">Flick the ball. Hit the targets. Win big.</div>
     <button class="start-btn" id="startBtn">Play</button>
     <div class="start-hint">Swipe across the ball to shoot</div>
   </div>
