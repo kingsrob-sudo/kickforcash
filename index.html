@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.2</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.5</div>
     </div>
   </div>
 
@@ -708,36 +708,236 @@
       netColor: 'rgba(255,255,255,0.0)',
     };
 
-    // Targets — 3 targets centered in goal, slightly above center to avoid logo
+    // Targets — 3 targets centered in goal
     const TARGET_COUNT = 3;
     let targets = [];
+    let targetRespawnTimer = 0;  // frames since last hit (5s = ~300 frames)
+    const TARGET_RESPAWN_DELAY = 300; // 5 seconds at 60fps
+
+    // Home positions for targets
+    const TARGET_PADDING = 20;
+    const TARGET_USABLE_W = goal.width - TARGET_PADDING * 2;
+    const TARGET_USABLE_H = goal.height - TARGET_PADDING * 2;
+    const TARGET_HOME = [
+      { x: goal.x + TARGET_PADDING + TARGET_USABLE_W * 0.15, y: goal.y + TARGET_PADDING + TARGET_USABLE_H * 0.38 },
+      { x: goal.x + TARGET_PADDING + TARGET_USABLE_W * 0.5,  y: goal.y + TARGET_PADDING + TARGET_USABLE_H * 0.32 },
+      { x: goal.x + TARGET_PADDING + TARGET_USABLE_W * 0.85, y: goal.y + TARGET_PADDING + TARGET_USABLE_H * 0.38 },
+    ];
+
+    // Movement bounds inside goal
+    const TGT_LEFT = goal.x + goal.postWidth + 30;
+    const TGT_RIGHT = goal.x + goal.width - goal.postWidth - 30;
+    const TGT_TOP = goal.y + goal.postWidth + 10;
+    const TGT_BOTTOM = goal.y + goal.height - 10;
 
     function spawnTargets() {
       targets = [];
-      const padding = 20;
-      const usableW = goal.width - padding * 2;
-      const usableH = goal.height - padding * 2;
-
-      const positions = [
-        { x: 0.15, y: 0.38 },   // left
-        { x: 0.5, y: 0.32 },    // center (slightly higher)
-        { x: 0.85, y: 0.38 },   // right
-      ];
+      targetRespawnTimer = 0;
 
       for (let i = 0; i < TARGET_COUNT; i++) {
-        const pos = positions[i];
         targets.push({
-          x: goal.x + padding + usableW * pos.x,
-          y: goal.y + padding + usableH * pos.y,
+          x: TARGET_HOME[i].x,
+          y: TARGET_HOME[i].y,
+          homeX: TARGET_HOME[i].x,
+          homeY: TARGET_HOME[i].y,
           radius: 44,
           alive: true,
           hitAnim: 0,
-          // Entrance: each target drops in from above with staggered timing
+          // Movement velocity
+          vx: 0,
+          vy: 0,
+          // Hover phase offset (for 3-alive gentle float)
+          hoverPhase: i * Math.PI * 0.7,
+          // Entrance animation
           enterT: 0,
-          enterDelay: i * 0.15,  // stagger: 0, 0.15, 0.3 seconds
-          enterStartY: goal.y - 60, // start above the crossbar
+          enterDelay: i * 0.15,
+          enterStartY: goal.y - 60,
+          // Glide-back animation (smooth return to home)
+          gliding: false,
+          glideT: 0,
+          glideFromX: 0,
+          glideFromY: 0,
         });
       }
+    }
+
+    function getAliveCount() {
+      return targets.filter(t => t.alive).length;
+    }
+
+    function updateTargets() {
+      const alive = getAliveCount();
+
+      // ── RESPAWN TIMER ──
+      if (alive > 0 && alive < 3) {
+        targetRespawnTimer++;
+        if (targetRespawnTimer >= TARGET_RESPAWN_DELAY) {
+          respawnOneTarget();
+        }
+      }
+
+      for (const t of targets) {
+        if (!t.alive) continue;
+
+        // If target is gliding back to home, animate that
+        if (t.gliding) {
+          t.glideT += 0.03; // ~33 frames to settle
+          if (t.glideT >= 1) {
+            t.glideT = 1;
+            t.gliding = false;
+            t.x = t.homeX;
+            t.y = t.homeY;
+            t.vx = 0;
+            t.vy = 0;
+          } else {
+            const eased = 1 - Math.pow(1 - t.glideT, 3);
+            t.x = t.glideFromX + (t.homeX - t.glideFromX) * eased;
+            t.y = t.glideFromY + (t.homeY - t.glideFromY) * eased;
+          }
+          continue; // skip physics while gliding
+        }
+
+        // If entrance animation not done, skip movement
+        const rawT = Math.max(0, t.enterT - t.enterDelay) / (1 - t.enterDelay);
+        if (rawT < 1) continue;
+
+        if (alive === 3) {
+          // ── GENTLE HOVER: slow sine wave up/down ──
+          t.hoverPhase += 0.03;
+          t.x = t.homeX;
+          t.y = t.homeY + Math.sin(t.hoverPhase) * 8;
+
+        } else if (alive === 2) {
+          // ── MEDIUM BOUNCE: move and bounce off walls and each other ──
+          const speed = 2.4;
+
+          // Initialize velocity if zero
+          if (t.vx === 0 && t.vy === 0) {
+            const angle = Math.random() * Math.PI * 2;
+            t.vx = Math.cos(angle) * speed;
+            t.vy = Math.sin(angle) * speed;
+          }
+
+          // Maintain consistent speed
+          const curSpeed = Math.sqrt(t.vx * t.vx + t.vy * t.vy);
+          if (curSpeed > 0.1) {
+            t.vx = (t.vx / curSpeed) * speed;
+            t.vy = (t.vy / curSpeed) * speed;
+          }
+
+          t.x += t.vx;
+          t.y += t.vy;
+
+          // Bounce off goal walls
+          if (t.x - t.radius < TGT_LEFT)  { t.x = TGT_LEFT + t.radius;  t.vx = Math.abs(t.vx); }
+          if (t.x + t.radius > TGT_RIGHT) { t.x = TGT_RIGHT - t.radius; t.vx = -Math.abs(t.vx); }
+          if (t.y - t.radius < TGT_TOP)    { t.y = TGT_TOP + t.radius;    t.vy = Math.abs(t.vy); }
+          if (t.y + t.radius > TGT_BOTTOM) { t.y = TGT_BOTTOM - t.radius; t.vy = -Math.abs(t.vy); }
+
+        } else if (alive === 1) {
+          // ── FAST ERRATIC: fast bouncing inside goal ──
+          const speed = 7.5;
+
+          if (t.vx === 0 && t.vy === 0) {
+            const angle = Math.random() * Math.PI * 2;
+            t.vx = Math.cos(angle) * speed;
+            t.vy = Math.sin(angle) * speed;
+          }
+
+          const curSpeed = Math.sqrt(t.vx * t.vx + t.vy * t.vy);
+          if (curSpeed > 0.1) {
+            t.vx = (t.vx / curSpeed) * speed;
+            t.vy = (t.vy / curSpeed) * speed;
+          }
+
+          t.x += t.vx;
+          t.y += t.vy;
+
+          // Bounce off goal walls
+          if (t.x - t.radius < TGT_LEFT)  { t.x = TGT_LEFT + t.radius;  t.vx = Math.abs(t.vx); }
+          if (t.x + t.radius > TGT_RIGHT) { t.x = TGT_RIGHT - t.radius; t.vx = -Math.abs(t.vx); }
+          if (t.y - t.radius < TGT_TOP)    { t.y = TGT_TOP + t.radius;    t.vy = Math.abs(t.vy); }
+          if (t.y + t.radius > TGT_BOTTOM) { t.y = TGT_BOTTOM - t.radius; t.vy = -Math.abs(t.vy); }
+        }
+      }
+
+      // ── TARGET-TARGET COLLISION (for 2-alive mode) ──
+      if (alive === 2) {
+        const aliveTargets = targets.filter(t => t.alive && !t.gliding);
+        if (aliveTargets.length === 2) {
+          const a = aliveTargets[0];
+          const b = aliveTargets[1];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = a.radius + b.radius;
+
+          if (dist < minDist && dist > 0) {
+            // Push apart
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const overlap = minDist - dist;
+            a.x -= nx * overlap * 0.5;
+            a.y -= ny * overlap * 0.5;
+            b.x += nx * overlap * 0.5;
+            b.y += ny * overlap * 0.5;
+
+            // Swap velocity components along collision normal
+            const aVn = a.vx * nx + a.vy * ny;
+            const bVn = b.vx * nx + b.vy * ny;
+            a.vx += (bVn - aVn) * nx;
+            a.vy += (bVn - aVn) * ny;
+            b.vx += (aVn - bVn) * nx;
+            b.vy += (aVn - bVn) * ny;
+          }
+        }
+      }
+    }
+
+    function respawnOneTarget() {
+      targetRespawnTimer = 0;
+      const alive = getAliveCount();
+
+      // Find a dead target to respawn
+      const deadTarget = targets.find(t => !t.alive);
+      if (!deadTarget) return;
+
+      // Respawn it with entrance animation
+      deadTarget.alive = true;
+      deadTarget.hitAnim = 0;
+      deadTarget.enterT = 0;
+      deadTarget.enterDelay = 0;
+      deadTarget.enterStartY = goal.y - 60;
+      deadTarget.vx = 0;
+      deadTarget.vy = 0;
+
+      // Glide existing alive targets back to their home positions
+      for (const t of targets) {
+        if (t === deadTarget) continue;
+        if (!t.alive) continue;
+        t.gliding = true;
+        t.glideT = 0;
+        t.glideFromX = t.x;
+        t.glideFromY = t.y;
+        t.vx = 0;
+        t.vy = 0;
+      }
+    }
+
+    function onTargetHit() {
+      // Reset respawn timer on every hit
+      targetRespawnTimer = 0;
+
+      const alive = getAliveCount();
+
+      if (alive === 0) {
+        // All targets down — full respawn after delay
+        setTimeout(() => {
+          if (gameState === 'playing') spawnTargets();
+        }, 600);
+      }
+      // Otherwise the state machine naturally handles
+      // 3→2 (start moving), 2→1 (go fast), via alive count
     }
 
     // Particles for hit effects
@@ -830,8 +1030,7 @@
     function onDown(e) {
       e.preventDefault();
       if (gameState !== 'playing' || ball.entering) return;
-      // Allow kicking even if previous ball is bouncing — it'll become a dead ball
-      if (ball.flying && ball.phase === 'flight') return;
+      // No blocking — you can always kick. Previous ball becomes a dead ball.
 
       touchActive = true;
       kickFired = false;
@@ -945,8 +1144,8 @@
     }
 
     function fireKick(dx, dy, swipeSpeed, spinDeviation) {
-      // If ball is currently bouncing, convert it to a dead ball first
-      if (ball.flying && ball.phase === 'bounce') {
+      // If ball is currently flying or bouncing, convert it to a dead ball
+      if (ball.flying) {
         const deadR = ball.radius * ball.visualScale * 1.5;
         const deadShadowY = ball.bounceGroundY + deadR * 0.65;
         deadBalls.push({
@@ -1236,10 +1435,11 @@
           t.hitAnim = 1;
           ball.hitTarget = true;
 
-          // Distance-based scoring: how close to the target center?
-          // d=0 means dead center, d=t.radius means edge
-          // Normalize: 0 = center, 1 = edge of target
-          const accuracy = Math.min(d / t.radius, 1);
+          // Distance-based scoring: how close is the ball's edge to the target center?
+          // Subtract ballR so we measure penetration depth, not center-to-center
+          const edgeDist = Math.max(0, d - ballR);
+          // Normalize: 0 = ball edge is at target center, t.radius = barely clipping
+          const accuracy = Math.min(edgeDist / t.radius, 1);
           // 100 points at center, 30 at edge, linear interpolation
           const points = Math.round(100 - accuracy * 70);
 
@@ -1263,11 +1463,7 @@
             ball.bounceVX = Math.cos(randomAngle) * bounceSpeed;
           }
 
-          if (targets.every(tt => !tt.alive)) {
-            setTimeout(() => {
-              if (gameState === 'playing') spawnTargets();
-            }, 600);
-          }
+          onTargetHit();
         }
       }
     }
@@ -1954,10 +2150,12 @@
         // Update target entrance animations
         for (const t of targets) {
           if (t.enterT < 1) {
-            t.enterT += 0.04; // ~25 frames to fully enter
+            t.enterT += 0.04;
             if (t.enterT > 1) t.enterT = 1;
           }
         }
+        // Update target movement and respawn timer
+        updateTargets();
         // Remove dead balls older than 4 seconds
         const now = Date.now();
         deadBalls = deadBalls.filter(db => now - db.spawnTime < 4000);
