@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.7</div>
     </div>
   </div>
 
@@ -1407,7 +1407,6 @@
         ball.x = ball.groundX;
         ball.y = ball.bounceGroundY + ball.arcY;
 
-        checkTargetCollisions();
         checkPostCollisions();
         checkSideWallCollisions();
       }
@@ -1415,33 +1414,34 @@
 
     function checkTargetCollisions() {
       if (ball.hitTarget) return; // one target per ball
+      if (ball.phase !== 'flight') return; // only during flight, not bounce
 
       const ballR = ball.radius * ball.visualScale;
       const visibleDepth = ball.homeY - ball.visibleHorizonY;
 
-      // Only check target collisions when ball is at goal depth and descending
-      if (ball.phase === 'flight') {
-        // Must have reached at least 60% of visible depth
-        if (ball.depth < visibleDepth * 0.6) return;
-        // Must be descending (arcVY > 0 means falling)
-        if (ball.arcVY < 0) return;
-      }
+      // Must have reached at least 60% of visible depth and be descending
+      if (ball.depth < visibleDepth * 0.6) return;
+      if (ball.arcVY < 0) return;
 
       for (const t of targets) {
         if (!t.alive) continue;
         const d = distTo(ball.x, ball.y, t.x, t.y);
         if (d < ballR + t.radius) {
+          // Count alive BEFORE this target dies
+          const aliveBeforeHit = getAliveCount();
+
           t.alive = false;
           t.hitAnim = 1;
           ball.hitTarget = true;
 
-          // Distance-based scoring: how close is the ball's edge to the target center?
-          // Subtract ballR so we measure penetration depth, not center-to-center
+          // Distance-based scoring
           const edgeDist = Math.max(0, d - ballR);
-          // Normalize: 0 = ball edge is at target center, t.radius = barely clipping
           const accuracy = Math.min(edgeDist / t.radius, 1);
-          // 100 points at center, 30 at edge, linear interpolation
-          const points = Math.round(100 - accuracy * 70);
+          const basePoints = Math.round(100 - accuracy * 70);
+
+          // Multiplier based on state BEFORE hit: 3 alive=1x, 2 alive=2x, 1 alive=3x
+          const multiplier = aliveBeforeHit === 1 ? 3 : aliveBeforeHit === 2 ? 2 : 1;
+          const points = basePoints * multiplier;
 
           score += 0; // score added when popup reaches the score box
           spawnParticles(t.x, t.y);
