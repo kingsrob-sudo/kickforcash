@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v6.9</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.0</div>
     </div>
   </div>
 
@@ -593,21 +593,50 @@
     resize();
 
     // ============================================================
-    // BACKGROUND VIDEO
+    // BACKGROUND & PARALLAX
     // ============================================================
-    const bgVideo = document.createElement('video');
-    bgVideo.src = 'gameplayBG.mp4';
-    bgVideo.loop = true;
-    bgVideo.muted = true;
-    bgVideo.playsInline = true;
-    bgVideo.preload = 'auto';
-    let bgVideoReady = false;
-    bgVideo.addEventListener('canplaythrough', () => { bgVideoReady = true; });
-    // Also keep the static image as fallback
     const bgImage = new Image();
     bgImage.src = 'gameplayBG.jpg';
     let bgLoaded = false;
     bgImage.onload = () => { bgLoaded = true; };
+
+    // Background is 1280x2120 (640x1060 in game coords)
+    // Viewport is 540x960 — 50px bleed on each side
+    const BG_W = 640;
+    const BG_H = 1060;
+    const BG_BLEED = 50; // max pan in each direction
+
+    // Gyro parallax
+    let gyroX = 0; // -1 to 1 (left/right tilt)
+    let gyroY = 0; // -1 to 1 (forward/back tilt)
+    let gyroPermission = false;
+
+    function requestGyro() {
+      if (typeof DeviceMotionEvent !== 'undefined' &&
+          typeof DeviceMotionEvent.requestPermission === 'function') {
+        // iOS 13+ requires permission
+        DeviceMotionEvent.requestPermission()
+          .then(state => {
+            if (state === 'granted') {
+              gyroPermission = true;
+              window.addEventListener('deviceorientation', handleGyro);
+            }
+          })
+          .catch(console.error);
+      } else if ('DeviceOrientationEvent' in window) {
+        // Android — just works
+        gyroPermission = true;
+        window.addEventListener('deviceorientation', handleGyro);
+      }
+    }
+
+    function handleGyro(e) {
+      // gamma = left/right tilt (-90 to 90), beta = front/back tilt (-180 to 180)
+      // Normalize to -1..1 range, clamped. Use a narrow range for subtle effect.
+      const maxTilt = 20; // degrees of tilt for full pan
+      gyroX = Math.max(-1, Math.min(1, (e.gamma || 0) / maxTilt));
+      gyroY = Math.max(-1, Math.min(1, ((e.beta || 45) - 45) / maxTilt)); // 45° is neutral (phone held at angle)
+    }
 
     // ============================================================
     // BALL SPRITE SHEET
@@ -1651,7 +1680,10 @@
 
     function drawBackground() {
       if (bgLoaded) {
-        ctx.drawImage(bgImage, 0, 0, GW, GH);
+        // Parallax offset based on gyro tilt
+        const offsetX = -BG_BLEED + gyroX * BG_BLEED;
+        const offsetY = -BG_BLEED + gyroY * BG_BLEED;
+        ctx.drawImage(bgImage, offsetX, offsetY, BG_W, BG_H);
       } else {
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
@@ -2248,6 +2280,9 @@
       userMarketingConsent = marketingCheck.checked;
       userId = generateUUID();
 
+      // Request gyro permission (needs user gesture on iOS)
+      requestGyro();
+
       // POST registration to Users sheet
       postToUsers({
         user_id: userId,
@@ -2266,7 +2301,10 @@
     // ============================================================
     // BUTTON HANDLERS
     // ============================================================
-    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('startBtn').addEventListener('click', () => {
+      requestGyro();
+      startGame();
+    });
     // Ad close — show end screen
     document.getElementById('adCloseBtn').addEventListener('click', showEndScreen);
     // Play Again from end screen
