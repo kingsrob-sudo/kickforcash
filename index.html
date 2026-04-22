@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.2</div>
     </div>
   </div>
 
@@ -1037,9 +1037,10 @@
         clientX = e.clientX;
         clientY = e.clientY;
       }
+      // Subtract parallax offset so touch coords match the shifted scene
       return {
-        x: (clientX - rect.left) / scale,
-        y: (clientY - rect.top) / scale,
+        x: (clientX - rect.left) / scale - gyroX * BG_BLEED,
+        y: (clientY - rect.top) / scale - gyroY * BG_BLEED,
       };
     }
 
@@ -1665,6 +1666,12 @@
       ctx.save();
       ctx.scale(scale, scale);
 
+      // Parallax: shift the scene based on gyro tilt
+      const parallaxX = gyroX * BG_BLEED;
+      const parallaxY = gyroY * BG_BLEED;
+      ctx.save();
+      ctx.translate(parallaxX, parallaxY);
+
       drawBackground();
       drawBallShadow();
       drawDeadBalls();
@@ -1672,18 +1679,21 @@
       drawParticles();
       drawBall();
       drawScorePopups();
-      drawHUD();
       drawSwipeTrail();
 
-      ctx.restore();
+      ctx.restore(); // remove parallax translate
+
+      // HUD drawn without parallax — stays fixed on screen
+      drawHUD();
+
+      ctx.restore(); // remove scale
     }
 
     function drawBackground() {
       if (bgLoaded) {
-        // Parallax offset based on gyro tilt
-        const offsetX = -BG_BLEED + gyroX * BG_BLEED;
-        const offsetY = -BG_BLEED + gyroY * BG_BLEED;
-        ctx.drawImage(bgImage, offsetX, offsetY, BG_W, BG_H);
+        // Draw at -BG_BLEED offset so it's centered at rest
+        // The ctx.translate in draw() handles the parallax shift
+        ctx.drawImage(bgImage, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
       } else {
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
