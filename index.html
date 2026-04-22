@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.3</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.4</div>
     </div>
   </div>
 
@@ -999,7 +999,7 @@
 
     function spawnScorePopup(startX, startY, points) {
       const holdX = GW / 2;
-      const holdY = 190; // below the HUD bar, lowered 80px
+      const holdY = 150; // below the HUD bar
 
       scorePopups.push({
         // Phase tracking
@@ -1192,7 +1192,7 @@
       }
 
       // Power from swipe SPEED (px/sec) — not distance
-      const power = Math.min(Math.max((swipeSpeed - 150) / 1200, 0.1), 1.5);
+      const power = Math.min(Math.max((swipeSpeed - 200) / 2000, 0.1), 1.5);
 
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
