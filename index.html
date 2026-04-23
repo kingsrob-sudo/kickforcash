@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.8</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.9</div>
     </div>
   </div>
 
@@ -720,6 +720,18 @@
       bounceForwardSpeed: 0, // how fast bounceGroundY moves toward goal
       bounceDepthProgress: 0, // depth progress at time of bounce start
     };
+
+    // ── CAMERA CHASE ──
+    // Zoom follows ball during flight, snaps back on bounce/reset
+    let camZoom = 1.0;       // current zoom level (1.0 = no zoom)
+    let camTargetZoom = 1.0; // target zoom to ease toward
+    let camCenterX = GW / 2; // current camera center X
+    let camCenterY = GH / 2; // current camera center Y
+    let camTargetX = GW / 2; // target center X
+    let camTargetY = GH / 2; // target center Y
+    const CAM_MAX_ZOOM = 1.15;
+    const CAM_EASE_IN = 0.04;   // how fast zoom ramps up (slow follow)
+    const CAM_EASE_OUT = 0.12;  // how fast zoom snaps back (quick reset)
 
     // Swipe-across tracking
     // Full flow: swipe across ball → lift finger → line stays visible → ball launches
@@ -1040,11 +1052,15 @@
         clientX = e.clientX;
         clientY = e.clientY;
       }
-      // Subtract parallax offset so touch coords match the shifted scene
-      return {
-        x: (clientX - rect.left) / scale - gyroX * BG_BLEED,
-        y: (clientY - rect.top) / scale - gyroY * BG_BLEED,
-      };
+      // Convert screen coords to game coords, compensating for parallax + camera zoom
+      let gx = (clientX - rect.left) / scale - gyroX * BG_BLEED;
+      let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED;
+      // Undo camera zoom transform: translate(-center), scale(1/zoom), translate(center)
+      if (camZoom !== 1.0) {
+        gx = (gx - camCenterX) / camZoom + camCenterX;
+        gy = (gy - camCenterY) / camZoom + camCenterY;
+      }
+      return { x: gx, y: gy };
     }
 
     function distTo(ax, ay, bx, by) {
@@ -1688,6 +1704,49 @@
     // ============================================================
     // RENDERING
     // ============================================================
+    function updateCamera() {
+      if (ball.flying && ball.phase === 'flight') {
+        // During flight: zoom in, follow ball
+        const visibleDepth = ball.homeY - ball.visibleHorizonY;
+        const depthProgress = Math.min(1, ball.depth / visibleDepth);
+        
+        // Zoom ramps up with depth — more zoom as ball gets further
+        camTargetZoom = 1.0 + (CAM_MAX_ZOOM - 1.0) * depthProgress;
+        
+        // Camera center follows the ball
+        camTargetX = ball.x;
+        camTargetY = ball.y;
+        
+        // Ease in (slow follow)
+        camZoom += (camTargetZoom - camZoom) * CAM_EASE_IN;
+        camCenterX += (camTargetX - camCenterX) * CAM_EASE_IN;
+        camCenterY += (camTargetY - camCenterY) * CAM_EASE_IN;
+        
+      } else if (ball.flying && ball.phase === 'bounce') {
+        // During bounce: start pulling back
+        camTargetZoom = 1.0;
+        camTargetX = GW / 2;
+        camTargetY = GH / 2;
+        
+        camZoom += (camTargetZoom - camZoom) * CAM_EASE_OUT;
+        camCenterX += (camTargetX - camCenterX) * CAM_EASE_OUT;
+        camCenterY += (camTargetY - camCenterY) * CAM_EASE_OUT;
+        
+      } else {
+        // No ball flying: snap back to neutral
+        camTargetZoom = 1.0;
+        camTargetX = GW / 2;
+        camTargetY = GH / 2;
+        
+        camZoom += (camTargetZoom - camZoom) * CAM_EASE_OUT;
+        camCenterX += (camTargetX - camCenterX) * CAM_EASE_OUT;
+        camCenterY += (camTargetY - camCenterY) * CAM_EASE_OUT;
+      }
+      
+      // Clamp zoom to avoid floating point drift
+      if (Math.abs(camZoom - 1.0) < 0.001) camZoom = 1.0;
+    }
+
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
@@ -1699,6 +1758,13 @@
       ctx.save();
       ctx.translate(parallaxX, parallaxY);
 
+      // Camera chase: zoom centered on ball
+      if (camZoom !== 1.0) {
+        ctx.translate(camCenterX, camCenterY);
+        ctx.scale(camZoom, camZoom);
+        ctx.translate(-camCenterX, -camCenterY);
+      }
+
       drawBackground();
       drawBallShadow();
       drawDeadBalls();
@@ -1708,9 +1774,9 @@
       drawScorePopups();
       drawSwipeTrail();
 
-      ctx.restore(); // remove parallax translate
+      ctx.restore(); // remove parallax + camera transforms
 
-      // HUD drawn without parallax — stays fixed on screen
+      // HUD drawn without parallax or camera — stays fixed on screen
       drawHUD();
 
       ctx.restore(); // remove scale
@@ -2256,6 +2322,8 @@
         }
         // Update target movement and respawn timer
         updateTargets();
+        // Update camera chase
+        updateCamera();
         // Remove dead balls older than 4 seconds
         const now = Date.now();
         deadBalls = deadBalls.filter(db => now - db.spawnTime < 4000);
