@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.4</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.5</div>
     </div>
   </div>
 
@@ -1239,6 +1239,7 @@
       ball.flying = true;
       ball.phase = 'flight';
       ball.visualScale = ball.restingScale;
+      ballTrail = []; // clear trail for fresh kick
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1919,13 +1920,12 @@
     }
 
     // ── BALL COMET TRAIL — clean line VFX ──
-    const TRAIL_MAX = 20;
     let ballTrail = []; // array of {x, y, scale}
 
     function updateBallTrail() {
-      if (ball.flying && ball.phase === 'flight' && ball.depth > 5) {
+      if (ball.flying && ball.phase === 'flight') {
+        // Record every frame from kick to impact — no cap
         ballTrail.push({ x: ball.x, y: ball.y, scale: ball.visualScale });
-        if (ballTrail.length > TRAIL_MAX) ballTrail.shift();
       } else {
         // Drain trail when not in flight
         if (ballTrail.length > 0) ballTrail.shift();
