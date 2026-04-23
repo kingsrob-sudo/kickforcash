@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.1</div>
     </div>
   </div>
 
@@ -1229,7 +1229,7 @@
       // Depth (forward travel)
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = 1.5 + power * 2.5; // pixels of depth per frame
+      ball.depthSpeed = (1.5 + power * 2.5) * 0.7; // 30% slower for longer flight
 
       // Arc (vertical) — initial upward velocity, gravity will pull it down
       ball.arcY = 0;
@@ -1357,7 +1357,7 @@
         ball.depth += ball.depthSpeed * decel;
 
         // Arc physics: gravity pulls arcVY positive (downward)
-        const gravity = 0.32;
+        const gravity = 0.224; // 30% slower to match longer flight
         ball.arcVY += gravity;
         ball.arcY += ball.arcVY;  // arcY: negative = above ground, 0 = ground level
 
