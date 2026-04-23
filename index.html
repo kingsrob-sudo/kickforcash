@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.1</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.2</div>
     </div>
   </div>
 
@@ -729,7 +729,7 @@
     let camCenterY = GH / 2; // current camera center Y
     let camTargetX = GW / 2; // target center X
     let camTargetY = GH / 2; // target center Y
-    const CAM_MAX_ZOOM = 2.0;
+    const CAM_MAX_ZOOM = 1.5;
     const CAM_EASE_IN = 0.04;   // how fast zoom ramps up (slow follow)
     const CAM_EASE_OUT = 0.12;  // how fast zoom snaps back (quick reset)
 
@@ -1229,7 +1229,7 @@
       // Depth (forward travel)
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = (1.5 + power * 2.5) * 0.7; // 30% slower for longer flight
+      ball.depthSpeed = (1.5 + power * 2.5) * 0.85; // 15% slower for longer flight
 
       // Arc (vertical) — initial upward velocity, gravity will pull it down
       ball.arcY = 0;
@@ -1357,7 +1357,7 @@
         ball.depth += ball.depthSpeed * decel;
 
         // Arc physics: gravity pulls arcVY positive (downward)
-        const gravity = 0.224; // 30% slower to match longer flight
+        const gravity = 0.272; // 15% slower to match longer flight
         ball.arcVY += gravity;
         ball.arcY += ball.arcVY;  // arcY: negative = above ground, 0 = ground level
 
