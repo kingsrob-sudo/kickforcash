@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.4</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v7.8</div>
     </div>
   </div>
 
@@ -716,6 +716,9 @@
       bounceVX: 0,
       groundX: 0,          // used by shadow and dead balls
       hitTarget: false,     // one target per ball max
+      // Forward momentum during bounce
+      bounceForwardSpeed: 0, // how fast bounceGroundY moves toward goal
+      bounceDepthProgress: 0, // depth progress at time of bounce start
     };
 
     // Swipe-across tracking
@@ -994,7 +997,7 @@
     let scorePopups = [];
 
     // Score box position (top-right pill center) for the fly-to target
-    const SCORE_BOX_X = GW - 72;
+    const SCORE_BOX_X = GW - 24;
     const SCORE_BOX_Y = 36;
 
     function spawnScorePopup(startX, startY, points) {
@@ -1315,6 +1318,8 @@
       ball.bounceCount = 0;
       ball.bounceVY = 0;
       ball.bounceVX = 0;
+      ball.bounceForwardSpeed = 0;
+      ball.bounceDepthProgress = 0;
       ball.hitTarget = false;
       ball.entering = true;
       ball.enterT = 0;
@@ -1385,8 +1390,10 @@
           ball.phase = 'bounce';
           ball.bounceVY = -Math.abs(ball.arcVY) * 0.5;
           ball.bounceVX = (Math.random() - 0.5) * 3;
-          // Use the goal ground plane
-          ball.bounceGroundY = ball.visibleHorizonY;
+          ball.bounceGroundY = ball.groundScreenY;
+          // Carry forward momentum into bounce
+          ball.bounceForwardSpeed = ball.depthSpeed * Math.max(0.3, 1 - (ball.depth / ball.maxDepth) * 0.4) * 0.4;
+          ball.bounceDepthProgress = depthProgress;
         }
 
         // Ball went off screen sideways
@@ -1403,6 +1410,26 @@
         ball.arcY += ball.bounceVY;
         ball.groundX += ball.bounceVX;
         ball.rotation += ball.rotationSpeed * 0.5;
+
+        // Forward drift: ball continues rolling toward the goal
+        if (ball.bounceForwardSpeed > 0) {
+          const drift = ball.bounceForwardSpeed;
+          ball.bounceGroundY -= drift; // move up on screen (toward goal)
+          ball.bounceForwardSpeed *= 0.985; // slow down gradually
+
+          // Update depth progress and visual scale as ball rolls forward
+          ball.bounceDepthProgress += drift / (ball.homeY - ball.visibleHorizonY);
+          ball.bounceDepthProgress = Math.min(ball.bounceDepthProgress, 1);
+          const easedDepth = 1 - Math.pow(1 - ball.bounceDepthProgress, 2.5);
+          const farScale = 0.36;
+          ball.visualScale = ball.restingScale - easedDepth * (ball.restingScale - farScale);
+
+          // Clamp: don't roll past the goal
+          if (ball.bounceGroundY < ball.visibleHorizonY) {
+            ball.bounceGroundY = ball.visibleHorizonY;
+            ball.bounceForwardSpeed = 0;
+          }
+        }
 
         // Hit the ground
         if (ball.arcY >= 0) {
@@ -2036,115 +2063,146 @@
     function drawHUD() {
       if (gameState !== 'playing') return;
 
-      const barH = 72;
-      const barY = 0;
-      const barX = 0;
-      const barW = GW;
+      const barH = 110;
+      const barY = 8;
+      const barX = 8;
+      const barW = GW - 16;
+      const now = Date.now();
 
-      // ── Main bar background: dark gradient with sport stripe ──
+      // ── Main bar: frosted dark with rounded corners ──
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetY = 3;
       const barGrad = ctx.createLinearGradient(0, barY, 0, barY + barH);
-      barGrad.addColorStop(0, 'rgba(20, 12, 5, 0.95)');
-      barGrad.addColorStop(0.6, 'rgba(40, 20, 8, 0.92)');
-      barGrad.addColorStop(1, 'rgba(20, 12, 5, 0.9)');
+      barGrad.addColorStop(0, 'rgba(8, 15, 25, 0.92)');
+      barGrad.addColorStop(1, 'rgba(12, 20, 35, 0.88)');
       ctx.fillStyle = barGrad;
-      ctx.fillRect(barX, barY, barW, barH);
-
-      // Green accent stripe at bottom
-      const stripeGrad = ctx.createLinearGradient(0, barY + barH - 4, 0, barY + barH);
-      stripeGrad.addColorStop(0, '#48A943');
-      stripeGrad.addColorStop(1, '#2d7a2d');
-      ctx.fillStyle = stripeGrad;
-      ctx.fillRect(barX, barY + barH - 4, barW, 4);
-
-      // Thin orange line above the green
-      ctx.fillStyle = '#FFB27A';
-      ctx.fillRect(barX, barY + barH - 5, barW, 1);
-
-      // ── Timer section (left) ──
-      // Timer background pill
-      const timerPillX = 12;
-      const timerPillY = 12;
-      const timerPillW = 120;
-      const timerPillH = 48;
-      ctx.fillStyle = timeLeft <= 10 ? 'rgba(255, 40, 40, 0.25)' : 'rgba(255, 178, 122, 0.1)';
-      roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
+      roundRect(ctx, barX, barY, barW, barH, 18);
       ctx.fill();
-      ctx.strokeStyle = timeLeft <= 10 ? 'rgba(255, 60, 60, 0.6)' : 'rgba(255, 178, 122, 0.25)';
+      ctx.restore();
+
+      // Subtle border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
-      roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
+      roundRect(ctx, barX, barY, barW, barH, 18);
       ctx.stroke();
 
-      // Timer label
-      ctx.fillStyle = 'rgba(255, 178, 122, 0.6)';
-      ctx.font = 'bold 10px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText('TIME', timerPillX + timerPillW / 2, timerPillY + 5);
+      // ── Accent line at bottom of bar ──
+      ctx.save();
+      ctx.beginPath();
+      roundRect(ctx, barX, barY, barW, barH, 18);
+      ctx.clip();
+      const accentGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      accentGrad.addColorStop(0, '#48A943');
+      accentGrad.addColorStop(0.3, '#FFB27A');
+      accentGrad.addColorStop(0.7, '#FFB27A');
+      accentGrad.addColorStop(1, '#48A943');
+      ctx.fillStyle = accentGrad;
+      ctx.fillRect(barX, barY + barH - 3, barW, 3);
+      ctx.restore();
 
-      // Timer value
-      ctx.fillStyle = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
+      // ── TIMER (left) ──
+      const timerX = barX + 20;
+      const timerCY = barY + barH / 2;
+
+      // Circular timer ring
+      const ringR = 34;
+      const ringX = timerX + ringR;
+      const progress = timeLeft / 60;
+
+      // Background ring
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(ringX, timerCY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Progress ring
+      const ringColor = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
+      ctx.strokeStyle = ringColor;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(ringX, timerCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+
+      // Timer number inside ring
+      ctx.fillStyle = ringColor;
       ctx.font = 'bold 28px Arial';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(timeLeft + 's', timerPillX + timerPillW / 2, timerPillY + timerPillH - 4);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(timeLeft, ringX, timerCY + 1);
 
-      // Pulse effect when low time
+      // "TIME" label
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText('TIME', ringX + ringR + 10, timerCY);
+
+      // Pulse glow when low
       if (timeLeft <= 10 && timeLeft > 0) {
-        const pulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.3;
-        ctx.fillStyle = `rgba(255, 40, 40, ${pulse})`;
-        roundRect(ctx, timerPillX, timerPillY, timerPillW, timerPillH, 10);
-        ctx.fill();
+        const pulse = Math.sin(now * 0.008) * 0.4 + 0.4;
+        ctx.save();
+        ctx.shadowColor = `rgba(255, 50, 50, ${pulse})`;
+        ctx.shadowBlur = 25;
+        ctx.strokeStyle = `rgba(255, 50, 50, ${pulse * 0.8})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(ringX, timerCY, ringR + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // ── Score section (right) ──
-      const scorePillX = GW - 132;
-      const scorePillY = 12;
-      const scorePillW = 120;
-      const scorePillH = 48;
-      ctx.fillStyle = 'rgba(72, 169, 67, 0.12)';
-      roundRect(ctx, scorePillX, scorePillY, scorePillW, scorePillH, 10);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(72, 169, 67, 0.3)';
-      ctx.lineWidth = 1;
-      roundRect(ctx, scorePillX, scorePillY, scorePillW, scorePillH, 10);
-      ctx.stroke();
-
-      // Score label
-      ctx.fillStyle = 'rgba(72, 169, 67, 0.6)';
-      ctx.font = 'bold 10px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText('SCORE', scorePillX + scorePillW / 2, scorePillY + 5);
+      // ── SCORE (right) ──
+      const scoreRX = barX + barW - 20;
+      const scoreCY = timerCY;
 
       // Score value
       ctx.fillStyle = '#48A943';
-      ctx.font = 'bold 28px Arial';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(score, scorePillX + scorePillW / 2, scorePillY + scorePillH - 4);
+      ctx.font = 'bold 40px Arial';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(score, scoreRX, scoreCY - 4);
 
-      // ── Center: Game title ──
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = 'bold 11px Arial';
-      ctx.textAlign = 'center';
+      // "PTS" label
+      ctx.fillStyle = 'rgba(72, 169, 67, 0.5)';
+      ctx.font = 'bold 12px Arial';
       ctx.textBaseline = 'top';
-      ctx.fillText('KICK FOR CASH', GW / 2, 16);
+      ctx.textAlign = 'right';
+      ctx.fillText('PTS', scoreRX, scoreCY + 18);
 
-      // Soccer ball icon (small circle)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      ctx.beginPath();
-      ctx.arc(GW / 2, 46, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const a = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-        const px = GW / 2 + Math.cos(a) * 4;
-        const py = 46 + Math.sin(a) * 4;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      // ── CENTER: multiplier indicator ──
+      const alive = getAliveCount();
+      const mult = alive === 1 ? '3X' : alive === 2 ? '2X' : '1X';
+      const multColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FFB27A' : 'rgba(255,255,255,0.25)';
+
+      if (alive < 3) {
+        // Glowing multiplier badge
+        ctx.save();
+        ctx.shadowColor = multColor;
+        ctx.shadowBlur = alive === 1 ? 16 : 8;
+        ctx.fillStyle = multColor;
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(mult, GW / 2, scoreCY - 4);
+        ctx.restore();
+
+        // "BONUS" label
+        ctx.fillStyle = `${multColor}88`;
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('BONUS', GW / 2, scoreCY + 20);
+      } else {
+        // Subtle game name when no multiplier
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText("KICK'N CASH", GW / 2, scoreCY);
       }
-      ctx.closePath();
-      ctx.stroke();
     }
 
     function roundRect(ctx, x, y, w, h, r) {
