@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.6</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.0</div>
     </div>
   </div>
 
@@ -1009,8 +1009,8 @@
     let scorePopups = [];
 
     // Score box position (top-right pill center) for the fly-to target
-    const SCORE_BOX_X = GW - 30;
-    const SCORE_BOX_Y = GH - 45;
+    const SCORE_BOX_X = GW - 95;
+    const SCORE_BOX_Y = GH - 100;
 
     function spawnScorePopup(startX, startY, points) {
       const holdX = GW / 2;
@@ -2188,57 +2188,22 @@
       if (gameState !== 'playing') return;
 
       const now = Date.now();
-      const bottomY = GH - 10; // bottom edge with padding
 
-      // ── BOTTOM BAR BACKGROUND — sporty angled panel ──
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.6)';
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetY = -3;
-
-      // Angled sporty bar shape
-      ctx.beginPath();
-      ctx.moveTo(0, GH - 85);          // top-left, angled
-      ctx.lineTo(GW * 0.15, GH - 100); // angle up left
-      ctx.lineTo(GW * 0.35, GH - 95);
-      ctx.lineTo(GW * 0.5, GH - 105);  // peak center
-      ctx.lineTo(GW * 0.65, GH - 95);
-      ctx.lineTo(GW * 0.85, GH - 100);
-      ctx.lineTo(GW, GH - 85);         // top-right
-      ctx.lineTo(GW, GH);
-      ctx.lineTo(0, GH);
-      ctx.closePath();
-
-      const barGrad = ctx.createLinearGradient(0, GH - 105, 0, GH);
-      barGrad.addColorStop(0, 'rgba(8, 15, 25, 0.92)');
-      barGrad.addColorStop(0.3, 'rgba(12, 20, 35, 0.95)');
-      barGrad.addColorStop(1, 'rgba(5, 10, 18, 0.98)');
-      ctx.fillStyle = barGrad;
-      ctx.fill();
-
-      // Accent stripe at top of bar
-      ctx.save();
-      ctx.clip();
-      const accentGrad = ctx.createLinearGradient(0, 0, GW, 0);
-      accentGrad.addColorStop(0, '#48A943');
-      accentGrad.addColorStop(0.4, '#FFB27A');
-      accentGrad.addColorStop(0.6, '#FFB27A');
-      accentGrad.addColorStop(1, '#48A943');
-      ctx.fillStyle = accentGrad;
-      ctx.fillRect(0, GH - 105, GW, 3);
-      ctx.restore();
-
-      ctx.restore();
-
-      // ── TIMER (bottom-left) ──
-      const ringR = 30;
-      const ringX = 50;
-      const ringCY = GH - 48;
+      // ── TIMER (bottom-left) — no background, just the ring ──
+      const ringR = 63;
+      const ringX = 95;
+      const ringCY = GH - 100;
       const progress = timeLeft / 60;
 
+      // Dark backing circle for readability
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.arc(ringX, ringCY, ringR + 6, 0, Math.PI * 2);
+      ctx.fill();
+
       // Background ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 8;
       ctx.beginPath();
       ctx.arc(ringX, ringCY, ringR, 0, Math.PI * 2);
       ctx.stroke();
@@ -2246,7 +2211,7 @@
       // Progress ring
       const ringColor = timeLeft <= 10 ? '#ff4444' : '#FFB27A';
       ctx.strokeStyle = ringColor;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 8;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.arc(ringX, ringCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
@@ -2254,71 +2219,102 @@
       ctx.lineCap = 'butt';
 
       // Timer number
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 6;
       ctx.fillStyle = ringColor;
-      ctx.font = 'bold 24px Arial';
+      ctx.font = 'bold 54px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(timeLeft, ringX, ringCY + 1);
+      ctx.restore();
 
       // Pulse glow when low
       if (timeLeft <= 10 && timeLeft > 0) {
         const pulse = Math.sin(now * 0.008) * 0.4 + 0.4;
         ctx.save();
         ctx.shadowColor = `rgba(255, 50, 50, ${pulse})`;
-        ctx.shadowBlur = 25;
+        ctx.shadowBlur = 30;
         ctx.strokeStyle = `rgba(255, 50, 50, ${pulse * 0.8})`;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(ringX, ringCY, ringR + 4, 0, Math.PI * 2);
+        ctx.arc(ringX, ringCY, ringR + 6, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
 
-      // ── SCORE (bottom-right) ──
-      const scoreX = GW - 30;
-      const scoreCY = GH - 45;
+      // ── SCORE (bottom-right) in circle with respawn timer drain ──
+      const scoreX = GW - 95;
+      const scoreCY = GH - 100;
+      const scoreR = 63;
+
+      // Circle color based on multiplier state
+      const alive = getAliveCount();
+      const circleColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FF4444' : '#48A943';
+      const circleColorFaded = alive === 1 ? 'rgba(255, 215, 0, 0.15)' : alive === 2 ? 'rgba(255, 68, 68, 0.15)' : 'rgba(72, 169, 67, 0.15)';
+
+      // Dark backing circle
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.beginPath();
+      ctx.arc(scoreX, scoreCY, scoreR + 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Filled background
+      ctx.fillStyle = circleColorFaded;
+      ctx.beginPath();
+      ctx.arc(scoreX, scoreCY, scoreR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Background ring track
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(scoreX, scoreCY, scoreR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draining ring — based on respawn timer progress
+      // Full when you just hit a target, drains as timer counts toward respawn
+      const respawnProgress = (alive > 0 && alive < 3) ? 1 - (targetRespawnTimer / TARGET_RESPAWN_DELAY) : 1;
+      ctx.strokeStyle = circleColor;
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(scoreX, scoreCY, scoreR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, respawnProgress));
+      ctx.stroke();
+      ctx.lineCap = 'butt';
 
       // Score value
-      ctx.fillStyle = '#48A943';
-      ctx.font = 'bold 38px Arial';
-      ctx.textAlign = 'right';
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 42px Arial';
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(score, scoreX, scoreCY - 6);
+      ctx.fillText(score, scoreX, scoreCY - 4);
 
       // "PTS" label
-      ctx.fillStyle = 'rgba(72, 169, 67, 0.5)';
-      ctx.font = 'bold 11px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = 'bold 14px Arial';
       ctx.textBaseline = 'top';
-      ctx.textAlign = 'right';
-      ctx.fillText('PTS', scoreX, scoreCY + 14);
+      ctx.textAlign = 'center';
+      ctx.fillText('PTS', scoreX, scoreCY + 22);
+      ctx.restore();
 
-      // ── CENTER: multiplier indicator ──
-      const alive = getAliveCount();
-      const mult = alive === 1 ? '3X' : alive === 2 ? '2X' : '1X';
-      const multColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FFB27A' : 'rgba(255,255,255,0.2)';
-      const multCY = GH - 50;
-
+      // ── BONUS text above score circle ──
       if (alive < 3) {
+        const mult = alive === 1 ? '3X' : '2X';
+        const multColor = alive === 1 ? '#FFD700' : '#FFB27A';
+
         ctx.save();
         ctx.shadowColor = multColor;
         ctx.shadowBlur = alive === 1 ? 16 : 8;
         ctx.fillStyle = multColor;
-        ctx.font = 'bold 34px Arial';
+        ctx.font = 'bold 28px Arial';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(mult, GW / 2, multCY);
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(mult + ' BONUS', scoreX, scoreCY - scoreR - 12);
         ctx.restore();
-
-        ctx.fillStyle = `${multColor}88`;
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('BONUS', GW / 2, multCY + 22);
-      } else {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText("KICK'N CASH", GW / 2, multCY);
       }
     }
 
