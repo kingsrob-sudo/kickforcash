@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v8.6</div>
     </div>
   </div>
 
@@ -1009,12 +1009,12 @@
     let scorePopups = [];
 
     // Score box position (top-right pill center) for the fly-to target
-    const SCORE_BOX_X = GW - 24;
-    const SCORE_BOX_Y = 36;
+    const SCORE_BOX_X = GW - 30;
+    const SCORE_BOX_Y = GH - 45;
 
     function spawnScorePopup(startX, startY, points) {
       const holdX = GW / 2;
-      const holdY = 150; // below the HUD bar
+      const holdY = GH * 0.4; // center-ish screen, then flies down to score
 
       scorePopups.push({
         // Phase tracking
@@ -2187,59 +2187,60 @@
     function drawHUD() {
       if (gameState !== 'playing') return;
 
-      const barH = 110;
-      const barY = 8;
-      const barX = 8;
-      const barW = GW - 16;
       const now = Date.now();
+      const bottomY = GH - 10; // bottom edge with padding
 
-      // ── Main bar: frosted dark with rounded corners ──
+      // ── BOTTOM BAR BACKGROUND — sporty angled panel ──
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.shadowBlur = 15;
-      ctx.shadowOffsetY = 3;
-      const barGrad = ctx.createLinearGradient(0, barY, 0, barY + barH);
-      barGrad.addColorStop(0, 'rgba(8, 15, 25, 0.92)');
-      barGrad.addColorStop(1, 'rgba(12, 20, 35, 0.88)');
-      ctx.fillStyle = barGrad;
-      roundRect(ctx, barX, barY, barW, barH, 18);
-      ctx.fill();
-      ctx.restore();
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = -3;
 
-      // Subtle border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.lineWidth = 1;
-      roundRect(ctx, barX, barY, barW, barH, 18);
-      ctx.stroke();
-
-      // ── Accent line at bottom of bar ──
-      ctx.save();
+      // Angled sporty bar shape
       ctx.beginPath();
-      roundRect(ctx, barX, barY, barW, barH, 18);
+      ctx.moveTo(0, GH - 85);          // top-left, angled
+      ctx.lineTo(GW * 0.15, GH - 100); // angle up left
+      ctx.lineTo(GW * 0.35, GH - 95);
+      ctx.lineTo(GW * 0.5, GH - 105);  // peak center
+      ctx.lineTo(GW * 0.65, GH - 95);
+      ctx.lineTo(GW * 0.85, GH - 100);
+      ctx.lineTo(GW, GH - 85);         // top-right
+      ctx.lineTo(GW, GH);
+      ctx.lineTo(0, GH);
+      ctx.closePath();
+
+      const barGrad = ctx.createLinearGradient(0, GH - 105, 0, GH);
+      barGrad.addColorStop(0, 'rgba(8, 15, 25, 0.92)');
+      barGrad.addColorStop(0.3, 'rgba(12, 20, 35, 0.95)');
+      barGrad.addColorStop(1, 'rgba(5, 10, 18, 0.98)');
+      ctx.fillStyle = barGrad;
+      ctx.fill();
+
+      // Accent stripe at top of bar
+      ctx.save();
       ctx.clip();
-      const accentGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      const accentGrad = ctx.createLinearGradient(0, 0, GW, 0);
       accentGrad.addColorStop(0, '#48A943');
-      accentGrad.addColorStop(0.3, '#FFB27A');
-      accentGrad.addColorStop(0.7, '#FFB27A');
+      accentGrad.addColorStop(0.4, '#FFB27A');
+      accentGrad.addColorStop(0.6, '#FFB27A');
       accentGrad.addColorStop(1, '#48A943');
       ctx.fillStyle = accentGrad;
-      ctx.fillRect(barX, barY + barH - 3, barW, 3);
+      ctx.fillRect(0, GH - 105, GW, 3);
       ctx.restore();
 
-      // ── TIMER (left) ──
-      const timerX = barX + 20;
-      const timerCY = barY + barH / 2;
+      ctx.restore();
 
-      // Circular timer ring
-      const ringR = 34;
-      const ringX = timerX + ringR;
+      // ── TIMER (bottom-left) ──
+      const ringR = 30;
+      const ringX = 50;
+      const ringCY = GH - 48;
       const progress = timeLeft / 60;
 
       // Background ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(ringX, timerCY, ringR, 0, Math.PI * 2);
+      ctx.arc(ringX, ringCY, ringR, 0, Math.PI * 2);
       ctx.stroke();
 
       // Progress ring
@@ -2248,22 +2249,16 @@
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.arc(ringX, timerCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.arc(ringX, ringCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
       ctx.stroke();
       ctx.lineCap = 'butt';
 
-      // Timer number inside ring
+      // Timer number
       ctx.fillStyle = ringColor;
-      ctx.font = 'bold 28px Arial';
+      ctx.font = 'bold 24px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(timeLeft, ringX, timerCY + 1);
-
-      // "TIME" label
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText('TIME', ringX + ringR + 10, timerCY);
+      ctx.fillText(timeLeft, ringX, ringCY + 1);
 
       // Pulse glow when low
       if (timeLeft <= 10 && timeLeft > 0) {
@@ -2274,58 +2269,56 @@
         ctx.strokeStyle = `rgba(255, 50, 50, ${pulse * 0.8})`;
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(ringX, timerCY, ringR + 4, 0, Math.PI * 2);
+        ctx.arc(ringX, ringCY, ringR + 4, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
 
-      // ── SCORE (right) ──
-      const scoreRX = barX + barW - 20;
-      const scoreCY = timerCY;
+      // ── SCORE (bottom-right) ──
+      const scoreX = GW - 30;
+      const scoreCY = GH - 45;
 
       // Score value
       ctx.fillStyle = '#48A943';
-      ctx.font = 'bold 40px Arial';
+      ctx.font = 'bold 38px Arial';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(score, scoreRX, scoreCY - 4);
+      ctx.fillText(score, scoreX, scoreCY - 6);
 
       // "PTS" label
       ctx.fillStyle = 'rgba(72, 169, 67, 0.5)';
-      ctx.font = 'bold 12px Arial';
+      ctx.font = 'bold 11px Arial';
       ctx.textBaseline = 'top';
       ctx.textAlign = 'right';
-      ctx.fillText('PTS', scoreRX, scoreCY + 18);
+      ctx.fillText('PTS', scoreX, scoreCY + 14);
 
       // ── CENTER: multiplier indicator ──
       const alive = getAliveCount();
       const mult = alive === 1 ? '3X' : alive === 2 ? '2X' : '1X';
-      const multColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FFB27A' : 'rgba(255,255,255,0.25)';
+      const multColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FFB27A' : 'rgba(255,255,255,0.2)';
+      const multCY = GH - 50;
 
       if (alive < 3) {
-        // Glowing multiplier badge
         ctx.save();
         ctx.shadowColor = multColor;
         ctx.shadowBlur = alive === 1 ? 16 : 8;
         ctx.fillStyle = multColor;
-        ctx.font = 'bold 36px Arial';
+        ctx.font = 'bold 34px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(mult, GW / 2, scoreCY - 4);
+        ctx.fillText(mult, GW / 2, multCY);
         ctx.restore();
 
-        // "BONUS" label
         ctx.fillStyle = `${multColor}88`;
-        ctx.font = 'bold 11px Arial';
+        ctx.font = 'bold 10px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('BONUS', GW / 2, scoreCY + 20);
+        ctx.fillText('BONUS', GW / 2, multCY + 22);
       } else {
-        // Subtle game name when no multiplier
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.font = 'bold 14px Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText("KICK'N CASH", GW / 2, scoreCY);
+        ctx.fillText("KICK'N CASH", GW / 2, multCY);
       }
     }
 
