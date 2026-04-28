@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.6</div>
     </div>
   </div>
 
@@ -614,10 +614,12 @@
     grassLayer.onload = () => { grassLayerLoaded = true; };
 
     // All layers are 1480x2320 → 740x1160 in game coords
-    // Viewport is 540x960 — 100px bleed on each side
+    // Viewport is 540x960
     const BG_W = 740;
     const BG_H = 1160;
-    const BG_BLEED = 25; // max pan in each direction (reduced 75%)
+    const BG_OFFSET_X = -(BG_W - GW) / 2; // -100, centers art on viewport
+    const BG_OFFSET_Y = -(BG_H - GH) / 2; // -100, centers art on viewport
+    const BG_BLEED = 25; // max parallax pan in each direction
 
     // Gyro parallax
     let gyroX = 0; // -1 to 1 (left/right tilt)
@@ -1789,7 +1791,7 @@
         ctx.save();
         ctx.translate(pX * standsRate, gyroY * BG_BLEED * standsRate);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
-        ctx.drawImage(bgLayer, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
+        ctx.drawImage(bgLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
       }
 
@@ -1798,7 +1800,7 @@
         ctx.save();
         ctx.translate(pX * grassRate, gyroY * BG_BLEED * grassRate);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
-        ctx.drawImage(grassLayer, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
+        ctx.drawImage(grassLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
       }
 
@@ -1807,7 +1809,7 @@
         ctx.save();
         ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
-        ctx.drawImage(goalLayer, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
+        ctx.drawImage(goalLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
       }
 
