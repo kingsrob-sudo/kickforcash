@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.2</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.4</div>
     </div>
   </div>
 
@@ -695,7 +695,7 @@
     const KICK_CELL_W = 256;
     const KICK_CELL_H = 412;
     const KICK_TOTAL = 7;
-    const KICK_FRAME_DURATION = 4; // frames per animation frame (~67ms each)
+    const KICK_FRAME_DURATION = 5; // frames per animation frame (~83ms each)
 
     let kickAnim = {
       playing: false,
@@ -711,6 +711,7 @@
     // ============================================================
     let gameState = 'start'; // start | playing | ended
     let score = 0;
+    let scoreCountTarget = 0; // for count-up animation
     let timeLeft = 60;
     let timerInterval = null;
 
@@ -776,6 +777,9 @@
     const CAM_MAX_ZOOM = 1.5;
     const CAM_EASE_IN = 0.04;   // how fast zoom ramps up (slow follow)
     const CAM_EASE_OUT = 0.12;  // how fast zoom snaps back (quick reset)
+
+    // Screenshake
+    let screenShake = 0; // intensity, decays per frame
 
     // Swipe-across tracking
     // Full flow: swipe across ball → lift finger → line stays visible → ball launches
@@ -1188,28 +1192,21 @@
 
     function spawnScorePopup(startX, startY, points) {
       const holdX = GW / 2;
-      const holdY = GH * 0.4; // center-ish screen, then flies down to score
+      const holdY = goal.y - 40; // just above the goal
 
       scorePopups.push({
-        // Phase tracking
         phase: 'zoom',    // 'zoom' | 'hold' | 'fly' | 'done'
         timer: 0,
-
-        // Positions
-        startX, startY,   // where it spawned (target position)
-        holdX, holdY,     // top-center hold position
-        endX: SCORE_BOX_X, endY: SCORE_BOX_Y, // score box position
-
-        // Current render position
+        startX, startY,
+        holdX, holdY,
+        endX: SCORE_BOX_X, endY: SCORE_BOX_Y,
         x: startX,
         y: startY,
-
-        // Data
         points: points,
         text: '+' + points,
         scale: 0.5,
         alpha: 1,
-        scored: false,     // has the score been added yet?
+        scored: false,
       });
     }
 
@@ -1227,9 +1224,10 @@
         clientY = e.clientY;
       }
       // Compensate for goal-layer parallax (0.5 rate on both axes) + camera zoom
-      const goalRate = 0.8;
-      let gx = (clientX - rect.left) / scale - gyroX * BG_BLEED * goalRate;
-      let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED * goalRate;
+      const goalRateX = 1.0;
+      const goalRateY = 0.4;
+      let gx = (clientX - rect.left) / scale - gyroX * BG_BLEED * goalRateX;
+      let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED * goalRateY;
       if (camZoom !== 1.0) {
         gx = (gx - camCenterX) / camZoom + camCenterX;
         gy = (gy - camCenterY) / camZoom + camCenterY;
@@ -1440,6 +1438,7 @@
     // ============================================================
     function startGame() {
       score = 0;
+      scoreCountTarget = 0;
       timeLeft = 60;
       ball.x = ball.homeX;
       ball.y = GH + 80;
@@ -1705,6 +1704,7 @@
           score += 0; // score added when popup reaches the score box
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y, points);
+          screenShake = 1.0; // trigger screenshake
 
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
@@ -1871,8 +1871,8 @@
           s.alpha = 1 - eased * 0.5;
 
           if (t >= 1 && !s.scored) {
-            // Add score when it arrives
-            score += s.points;
+            // Start score count-up animation
+            scoreCountTarget = score + s.points;
             s.scored = true;
             s.phase = 'done';
             s.timer = 0;
@@ -1882,6 +1882,14 @@
           // Brief flash then remove
           s.alpha -= 0.15;
         }
+      }
+
+      // Count up score toward target
+      if (scoreCountTarget > score) {
+        const diff = scoreCountTarget - score;
+        const step = Math.max(1, Math.ceil(diff * 0.2));
+        score += step;
+        if (score >= scoreCountTarget) score = scoreCountTarget;
       }
 
       scorePopups = scorePopups.filter(s => s.phase !== 'done' || s.alpha > 0);
@@ -1941,9 +1949,19 @@
       // ── LAYERED PARALLAX ──
       // Three layers with different movement rates based on gyro
       const pX = gyroX * BG_BLEED;
-      const grassRate = 1.5;   // closest — moves most
-      const goalRate = 0.8;    // mid — moves more
-      const standsRate = 0.15; // far — subtle movement
+      const grassRate = 1.5;      // closest — moves most
+      const goalRateX = 1.0;      // mid horizontal — increased 25% from 0.8
+      const goalRateY = 0.4;      // mid vertical — reduced 50% from 0.8
+      const standsRate = 0.15;     // far — subtle movement
+
+      // Screenshake
+      let shakeX = 0, shakeY = 0;
+      if (screenShake > 0) {
+        shakeX = (Math.random() - 0.5) * screenShake * 12;
+        shakeY = (Math.random() - 0.5) * screenShake * 12;
+        screenShake *= 0.85; // decay
+        if (screenShake < 0.01) screenShake = 0;
+      }
 
       // Camera chase zoom
       const cz = camZoom;
@@ -1952,27 +1970,27 @@
 
       // Draw order (back to front):
       // 1. Background (stands/crowd) — furthest
-      // 2. Grass — in front of background
-      // 3. Goal posts/net — in front of grass
+      // 2. Goal posts/net
+      // 3. Grass — on top of goal
       // 4. Ball & effects — on top of everything
 
       // ── LAYER 1: Background (far — moves least) ──
       if (bgLayerLoaded) {
         ctx.save();
-        ctx.translate(pX * standsRate, gyroY * BG_BLEED * standsRate);
+        ctx.translate(pX * standsRate + shakeX, gyroY * BG_BLEED * standsRate + shakeY);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
         ctx.drawImage(bgLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
       }
 
-      // ── LAYER 2: Goal (mid — medium movement) ──
+      // ── LAYER 2: Goal (mid — split X/Y rates) ──
       if (goalLayerLoaded) {
         ctx.save();
-        ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
+        ctx.translate(pX * goalRateX + shakeX, gyroY * BG_BLEED * goalRateY + shakeY);
         // Subtle rotation following the grass, much smaller
         const goalPivotX = GW / 2;
         const goalPivotY = GH;
-        const goalRotAngle = gyroX * 0.015; // ~0.86° max
+        const goalRotAngle = gyroX * 0.015;
         ctx.translate(goalPivotX, goalPivotY);
         ctx.rotate(goalRotAngle);
         ctx.translate(-goalPivotX, -goalPivotY);
@@ -1981,15 +1999,19 @@
         ctx.restore();
       }
 
-      // ── LAYER 3: Grass (closest — on top of goal, rotates around bottom-center) ──
+      // ── LAYER 3: Grass (closest — rotates + vertical scale driven by gyro) ──
       if (grassLayerLoaded) {
         ctx.save();
         const grassPivotX = GW / 2;
         const grassPivotY = GH;
-        const rotAngle = gyroX * 0.06; // stronger rotation
+        const rotAngle = gyroX * 0.06;
+        // Vertical scale: tilt forward = grass stretches slightly, tilt back = shrinks
+        const grassScaleY = 1.0 + gyroY * 0.04;
         ctx.translate(grassPivotX, grassPivotY);
         ctx.rotate(rotAngle);
+        ctx.scale(1.0, grassScaleY);
         ctx.translate(-grassPivotX, -grassPivotY);
+        ctx.translate(shakeX, shakeY);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
         ctx.drawImage(grassLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
@@ -1997,7 +2019,7 @@
 
       // ── LAYER 4: Game elements — on top, move with goal layer ──
       ctx.save();
-      ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
+      ctx.translate(pX * goalRateX + shakeX, gyroY * BG_BLEED * goalRateY + shakeY);
       if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
 
       drawBallShadow();
@@ -2342,15 +2364,15 @@
         ctx.translate(s.x, s.y);
         ctx.scale(s.scale, s.scale);
 
-        // Glow/shadow behind text
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.font = 'bold 30px Arial';
+        // Dark shadow for readability
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.font = 'bold 36px Impact';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(s.text, 2, 2);
 
-        // Main text
-        ctx.fillStyle = s.points >= 80 ? '#FFD700' : s.points >= 50 ? '#48A943' : '#FFB27A';
+        // Main text — white
+        ctx.fillStyle = '#fff';
         ctx.fillText(s.text, 0, 0);
 
         ctx.restore();
