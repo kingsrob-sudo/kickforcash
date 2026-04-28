@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.2</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.4</div>
     </div>
   </div>
 
@@ -684,6 +684,29 @@
     targetImg.onload = () => { targetImgLoaded = true; };
 
     // ============================================================
+    // KICK ANIMATION SPRITE
+    // ============================================================
+    const kickSheet = new Image();
+    kickSheet.src = 'kick_sheet.png';
+    let kickSheetLoaded = false;
+    kickSheet.onload = () => { kickSheetLoaded = true; };
+
+    const KICK_COLS = 5;
+    const KICK_CELL_W = 256;
+    const KICK_CELL_H = 412;
+    const KICK_TOTAL = 5;
+    const KICK_FRAME_DURATION = 4; // frames per animation frame (~67ms each, ~330ms total)
+
+    let kickAnim = {
+      playing: false,
+      frame: 0,
+      timer: 0,
+      x: 0,       // position (foot contact point)
+      y: 0,
+      flipX: false, // mirror for left-side kicks
+    };
+
+    // ============================================================
     // GAME STATE
     // ============================================================
     let gameState = 'start'; // start | playing | ended
@@ -703,7 +726,7 @@
       x: GW / 2,          // screen x
       y: GH + 80,         // screen y (starts off-screen for entrance)
       radius: BALL_RADIUS,
-      homeX: GW / 2 + 1,
+      homeX: GW / 2 - 4,
       homeY: GH - 170,
       flying: false,
       visualScale: 2.6,
@@ -1261,6 +1284,14 @@
       ball.phase = 'flight';
       ball.visualScale = ball.restingScale;
       ballTrail = []; // clear trail for fresh kick
+
+      // Trigger kick leg animation — foot meets ball at its home position
+      kickAnim.playing = true;
+      kickAnim.frame = 0;
+      kickAnim.timer = 0;
+      kickAnim.x = ball.homeX;
+      kickAnim.y = ball.homeY;
+      kickAnim.flipX = dx < 0; // flip if kicking to the left
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1845,6 +1876,9 @@
         ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
       }
 
+      // ── KICK ANIMATION: on top of everything except HUD ──
+      drawKickAnim();
+
       // Fallback if nothing loaded
       if (!bgLayerLoaded && !goalLayerLoaded && !grassLayerLoaded) {
         ctx.fillStyle = '#1a3a1a';
@@ -1855,6 +1889,52 @@
       drawHUD();
 
       ctx.restore(); // remove scale
+    }
+
+    function updateKickAnim() {
+      if (!kickAnim.playing) return;
+      kickAnim.timer++;
+      if (kickAnim.timer >= KICK_FRAME_DURATION) {
+        kickAnim.timer = 0;
+        kickAnim.frame++;
+        if (kickAnim.frame >= KICK_TOTAL) {
+          kickAnim.playing = false;
+        }
+      }
+    }
+
+    function drawKickAnim() {
+      if (!kickAnim.playing || !kickSheetLoaded) return;
+
+      const frame = kickAnim.frame;
+      const sx = frame * KICK_CELL_W;
+      const sy = 0;
+
+      // Draw scale — the sprite is 256x412 in the sheet
+      // We want it to appear at a good size relative to the ball
+      const drawScale = 0.7; // adjust to match ball size
+      const drawW = KICK_CELL_W * drawScale;
+      const drawH = KICK_CELL_H * drawScale;
+
+      // Position: the foot (bottom-center of sprite) should be at the ball's position
+      // The foot is roughly at the bottom-center of each frame
+      const footOffsetX = drawW * 0.35; // foot is slightly left of center in the sprite
+      const footOffsetY = drawH * 0.85; // foot is near the bottom
+
+      ctx.save();
+      ctx.translate(kickAnim.x, kickAnim.y);
+
+      if (kickAnim.flipX) {
+        ctx.scale(-1, 1);
+      }
+
+      ctx.drawImage(
+        kickSheet,
+        sx, sy, KICK_CELL_W, KICK_CELL_H,  // source
+        -footOffsetX, -footOffsetY, drawW, drawH  // dest
+      );
+
+      ctx.restore();
     }
 
     function drawBallShadow() {
@@ -2414,6 +2494,7 @@
         }
         updateBall();
         updateBallTrail();
+        updateKickAnim();
         updateParticles();
         updateScorePopups();
         // Update target entrance animations
