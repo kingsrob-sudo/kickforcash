@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.6</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.9</div>
     </div>
   </div>
 
@@ -691,11 +691,11 @@
     let kickSheetLoaded = false;
     kickSheet.onload = () => { kickSheetLoaded = true; };
 
-    const KICK_COLS = 5;
+    const KICK_COLS = 7;
     const KICK_CELL_W = 256;
     const KICK_CELL_H = 412;
-    const KICK_TOTAL = 5;
-    const KICK_FRAME_DURATION = 4; // frames per animation frame (~67ms each, ~330ms total)
+    const KICK_TOTAL = 7;
+    const KICK_FRAME_DURATION = 8; // frames per animation frame (~133ms each, ~660ms total)
 
     let kickAnim = {
       playing: false,
@@ -1189,11 +1189,19 @@
       //    Positive deviation = finger went RIGHT of center → ball curves LEFT
       const spinDeviation = calculateSpinDeviation(pts);
 
-      // Fire the kick with a tiny delay so player sees the full trail
+      // Start kick animation immediately
       kickFired = true;
+      kickAnim.playing = true;
+      kickAnim.frame = 0;
+      kickAnim.timer = 0;
+      kickAnim.x = ball.homeX;
+      kickAnim.y = ball.homeY;
+
+      // Delay ball launch to sync with foot contact (frame 3 of kick anim)
+      const contactDelay = KICK_FRAME_DURATION * 2.5 * (1000 / 60); // ~333ms
       setTimeout(() => {
         fireKick(dx, dy, swipeSpeed, spinDeviation);
-      }, 120);
+      }, contactDelay);
 
       allTouchPoints = [];
     }
@@ -1284,13 +1292,6 @@
       ball.phase = 'flight';
       ball.visualScale = ball.restingScale;
       ballTrail = []; // clear trail for fresh kick
-
-      // Trigger kick leg animation — foot meets ball at its home position
-      kickAnim.playing = true;
-      kickAnim.frame = 0;
-      kickAnim.timer = 0;
-      kickAnim.x = ball.homeX;
-      kickAnim.y = ball.homeY;
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1916,18 +1917,15 @@
       const sx = frame * KICK_CELL_W;
       const sy = 0;
 
-      // The sprite should span from the left edge of the screen to the ball
-      // The foot (right side of sprite) makes contact with the ball
-      // Scale so the sprite width reaches from x=0 to ball.homeX + some overshoot
-      const targetWidth = kickAnim.x + 40; // extend a bit past the ball
+      // Sprite spans from left edge well past the ball
+      const targetWidth = kickAnim.x + 120; // extend further past the ball
       const drawScale = targetWidth / KICK_CELL_W;
       const drawW = targetWidth;
       const drawH = KICK_CELL_H * drawScale;
 
-      // Position: left edge at screen left, foot (right-center area) at ball position
-      // The foot in the sprite is roughly at 75% of the width and 80% of the height
-      const drawX = 0;
-      const drawY = kickAnim.y - drawH * 0.75;
+      // Left edge starts off-screen left for more leg visible
+      const drawX = -40;
+      const drawY = kickAnim.y - drawH * 0.72;
 
       ctx.save();
       ctx.drawImage(
@@ -2366,7 +2364,7 @@
       ctx.shadowColor = 'rgba(0,0,0,0.7)';
       ctx.shadowBlur = 6;
       ctx.fillStyle = ringColor;
-      ctx.font = 'bold 54px Arial';
+      ctx.font = 'bold 54px Impact';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(timeLeft, ringX, ringCY + 1);
@@ -2431,25 +2429,24 @@
       ctx.shadowColor = 'rgba(0,0,0,0.7)';
       ctx.shadowBlur = 8;
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 54px Arial';
+      ctx.font = 'bold 54px Impact';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(score, scoreX, scoreCY + 1);
       ctx.restore();
 
-      // ── BONUS text above score circle ──
+      // ── Multiplier text at top of score circle ──
       if (alive < 3) {
         const mult = alive === 1 ? '3X' : '2X';
-        const multColor = alive === 1 ? '#B8860B' : '#CC3333';
 
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = 6;
-        ctx.fillStyle = multColor;
-        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 24px Impact';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(mult + ' BONUS', scoreX, scoreCY - scoreR - 12);
+        ctx.fillText(mult, scoreX, scoreCY - scoreR + 22);
         ctx.restore();
       }
     }

@@ -69,6 +69,32 @@
             <key>sourceSize</key>
             <string>{256,412}</string>
         </dict>
+        <key>kick_6.png</key>
+        <dict>
+            <key>frame</key>
+            <string>{{1280,0},{256,412}}</string>
+            <key>offset</key>
+            <string>{0,0}</string>
+            <key>rotated</key>
+            <false/>
+            <key>sourceColorRect</key>
+            <string>{{0,0},{256,412}}</string>
+            <key>sourceSize</key>
+            <string>{256,412}</string>
+        </dict>
+        <key>kick_7.png</key>
+        <dict>
+            <key>frame</key>
+            <string>{{1536,0},{256,412}}</string>
+            <key>offset</key>
+            <string>{0,0}</string>
+            <key>rotated</key>
+            <false/>
+            <key>sourceColorRect</key>
+            <string>{{0,0},{256,412}}</string>
+            <key>sourceSize</key>
+            <string>{256,412}</string>
+        </dict>
     </dict>
     <key>metadata</key>
     <dict>
@@ -77,7 +103,7 @@
         <key>realTextureFileName</key>
         <string>kick_sheet.png</string>
         <key>size</key>
-        <string>{1280,412}</string>
+        <string>{1792,412}</string>
         <key>textureFileName</key>
         <string>kick_sheet.png</string>
     </dict>
