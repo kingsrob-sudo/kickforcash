@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.2</div>
     </div>
   </div>
 
@@ -707,7 +707,7 @@
       homeY: GH - 170,
       flying: false,
       visualScale: 2.6,
-      restingScale: 2.6,
+      restingScale: 3.12,
       // Entrance animation
       entering: false,
       enterT: 0,
@@ -1810,12 +1810,12 @@
         ctx.restore();
       }
 
-      // ── LAYER 3: Grass (closest — on top of goal, rotates around ball kick point) ──
+      // ── LAYER 3: Grass (closest — on top of goal, rotates around bottom-center) ──
       if (grassLayerLoaded) {
         ctx.save();
-        const grassPivotX = ball.homeX;
-        const grassPivotY = ball.homeY;
-        const rotAngle = gyroX * 0.03;
+        const grassPivotX = GW / 2;
+        const grassPivotY = GH;
+        const rotAngle = gyroX * 0.06; // stronger rotation
         ctx.translate(grassPivotX, grassPivotY);
         ctx.rotate(rotAngle);
         ctx.translate(-grassPivotX, -grassPivotY);
@@ -2312,8 +2312,8 @@
 
       // Circle color based on multiplier state
       const alive = getAliveCount();
-      const circleColor = alive === 1 ? '#FFD700' : alive === 2 ? '#FF4444' : '#48A943';
-      const circleColorFaded = alive === 1 ? 'rgba(255, 215, 0, 0.15)' : alive === 2 ? 'rgba(255, 68, 68, 0.15)' : 'rgba(72, 169, 67, 0.15)';
+      const circleColor = alive === 1 ? '#B8860B' : alive === 2 ? '#CC3333' : '#48A943';
+      const circleColorFaded = alive === 1 ? 'rgba(184, 134, 11, 0.2)' : alive === 2 ? 'rgba(204, 51, 51, 0.2)' : 'rgba(72, 169, 67, 0.15)';
 
       // Dark backing circle
       ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -2350,27 +2350,20 @@
       ctx.shadowColor = 'rgba(0,0,0,0.7)';
       ctx.shadowBlur = 8;
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 42px Arial';
+      ctx.font = 'bold 54px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(score, scoreX, scoreCY - 4);
-
-      // "PTS" label
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.font = 'bold 14px Arial';
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'center';
-      ctx.fillText('PTS', scoreX, scoreCY + 22);
+      ctx.fillText(score, scoreX, scoreCY + 1);
       ctx.restore();
 
       // ── BONUS text above score circle ──
       if (alive < 3) {
         const mult = alive === 1 ? '3X' : '2X';
-        const multColor = alive === 1 ? '#FFD700' : '#FFB27A';
+        const multColor = alive === 1 ? '#B8860B' : '#CC3333';
 
         ctx.save();
-        ctx.shadowColor = multColor;
-        ctx.shadowBlur = alive === 1 ? 16 : 8;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 6;
         ctx.fillStyle = multColor;
         ctx.font = 'bold 28px Arial';
         ctx.textAlign = 'center';
