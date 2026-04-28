@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.1</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.2</div>
     </div>
   </div>
 
@@ -642,16 +642,16 @@
     // BALL SPRITE SHEET
     // ============================================================
     const ballSheet = new Image();
-    ballSheet.src = 'ball_all_.png';
+    ballSheet.src = 'ball12.png';
     let ballSheetLoaded = false;
     ballSheet.onload = () => { ballSheetLoaded = true; };
 
-    // Sprite sheet config: 8x8 grid, 128px cells, ball ~88x86 centered
-    const SPRITE_COLS = 8;
-    const SPRITE_ROWS = 8;
-    const SPRITE_CELL = 128;
-    const SPRITE_TOTAL = 64;
-    let ballFrame = 0;         // current frame index (0-63)
+    // Sprite sheet config: 4x3 grid, 256px cells, 12 frames
+    const SPRITE_COLS = 4;
+    const SPRITE_ROWS = 3;
+    const SPRITE_CELL = 256;
+    const SPRITE_TOTAL = 12;
+    let ballFrame = 0;         // current frame index (0-11)
     let ballFrameAccum = 0;    // accumulator for frame stepping
 
     // ============================================================
