@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.4</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.6</div>
     </div>
   </div>
 
@@ -1291,7 +1291,6 @@
       kickAnim.timer = 0;
       kickAnim.x = ball.homeX;
       kickAnim.y = ball.homeY;
-      kickAnim.flipX = dx < 0; // flip if kicking to the left
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1836,6 +1835,13 @@
       if (goalLayerLoaded) {
         ctx.save();
         ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
+        // Subtle rotation following the grass, much smaller
+        const goalPivotX = GW / 2;
+        const goalPivotY = GH;
+        const goalRotAngle = gyroX * 0.015; // ~0.86° max
+        ctx.translate(goalPivotX, goalPivotY);
+        ctx.rotate(goalRotAngle);
+        ctx.translate(-goalPivotX, -goalPivotY);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
         ctx.drawImage(goalLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
@@ -1910,30 +1916,25 @@
       const sx = frame * KICK_CELL_W;
       const sy = 0;
 
-      // Draw scale — the sprite is 256x412 in the sheet
-      // We want it to appear at a good size relative to the ball
-      const drawScale = 0.7; // adjust to match ball size
-      const drawW = KICK_CELL_W * drawScale;
+      // The sprite should span from the left edge of the screen to the ball
+      // The foot (right side of sprite) makes contact with the ball
+      // Scale so the sprite width reaches from x=0 to ball.homeX + some overshoot
+      const targetWidth = kickAnim.x + 40; // extend a bit past the ball
+      const drawScale = targetWidth / KICK_CELL_W;
+      const drawW = targetWidth;
       const drawH = KICK_CELL_H * drawScale;
 
-      // Position: the foot (bottom-center of sprite) should be at the ball's position
-      // The foot is roughly at the bottom-center of each frame
-      const footOffsetX = drawW * 0.35; // foot is slightly left of center in the sprite
-      const footOffsetY = drawH * 0.85; // foot is near the bottom
+      // Position: left edge at screen left, foot (right-center area) at ball position
+      // The foot in the sprite is roughly at 75% of the width and 80% of the height
+      const drawX = 0;
+      const drawY = kickAnim.y - drawH * 0.75;
 
       ctx.save();
-      ctx.translate(kickAnim.x, kickAnim.y);
-
-      if (kickAnim.flipX) {
-        ctx.scale(-1, 1);
-      }
-
       ctx.drawImage(
         kickSheet,
-        sx, sy, KICK_CELL_W, KICK_CELL_H,  // source
-        -footOffsetX, -footOffsetY, drawW, drawH  // dest
+        sx, sy, KICK_CELL_W, KICK_CELL_H,
+        drawX, drawY, drawW, drawH
       );
-
       ctx.restore();
     }
 
