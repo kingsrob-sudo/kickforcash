@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.1</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.2</div>
     </div>
   </div>
 
@@ -1035,21 +1035,40 @@
     let impactVFX = [];
 
     function spawnImpactVFX(x, y) {
-      // Flash ring - expanding white circle
+      // Flash ring - big expanding white circle
+      impactVFX.push({
+        type: 'ring',
+        x, y,
+        radius: 20,
+        maxRadius: 200,
+        life: 1.0,
+        speed: 0.04,
+      });
+
+      // Second ring - slightly delayed, different size
       impactVFX.push({
         type: 'ring',
         x, y,
         radius: 10,
-        maxRadius: 80,
-        life: 1.0,
-        speed: 0.06,
+        maxRadius: 150,
+        life: 0.85,
+        speed: 0.05,
       });
 
-      // Speed lines - radiate outward from impact
-      for (let i = 0; i < 8; i++) {
-        const angle = -Math.PI * 0.6 + (Math.random() * Math.PI * 0.5); // mostly upward/forward
-        const speed = 4 + Math.random() * 6;
-        const len = 15 + Math.random() * 25;
+      // Flash - bright white circle that appears and fades fast
+      impactVFX.push({
+        type: 'flash',
+        x, y,
+        radius: 60,
+        life: 1.0,
+        speed: 0.08,
+      });
+
+      // Speed lines - lots of them radiating outward
+      for (let i = 0; i < 16; i++) {
+        const angle = -Math.PI * 0.7 + (Math.random() * Math.PI * 0.8);
+        const speed = 6 + Math.random() * 12;
+        const len = 30 + Math.random() * 60;
         impactVFX.push({
           type: 'line',
           x, y,
@@ -1058,24 +1077,24 @@
           len: len,
           angle: angle,
           life: 1.0,
-          speed: 0.05 + Math.random() * 0.03,
-          color: ['#fff', '#FFD700', '#FFB27A', '#48A943'][Math.floor(Math.random() * 4)],
+          speed: 0.03 + Math.random() * 0.03,
+          color: ['#fff', '#FFD700', '#FFB27A', '#48A943', '#fff'][Math.floor(Math.random() * 5)],
         });
       }
 
-      // Burst sparks
-      for (let i = 0; i < 16; i++) {
+      // Burst sparks - big explosion
+      for (let i = 0; i < 30; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 3 + Math.random() * 8;
+        const speed = 4 + Math.random() * 14;
         impactVFX.push({
           type: 'spark',
           x, y,
           vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 2,
+          vy: Math.sin(angle) * speed - 3,
           life: 1.0,
-          speed: 0.04 + Math.random() * 0.03,
-          size: 2 + Math.random() * 4,
-          color: ['#fff', '#FFD700', '#FFB27A'][Math.floor(Math.random() * 3)],
+          speed: 0.025 + Math.random() * 0.025,
+          size: 3 + Math.random() * 8,
+          color: ['#fff', '#FFD700', '#FFB27A', '#48A943'][Math.floor(Math.random() * 4)],
         });
       }
     }
@@ -1110,13 +1129,22 @@
 
         if (v.type === 'ring') {
           ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 3 * v.life;
+          ctx.lineWidth = 5 * v.life;
           ctx.beginPath();
           ctx.arc(v.x, v.y, v.radius, 0, Math.PI * 2);
           ctx.stroke();
+        } else if (v.type === 'flash') {
+          const grad = ctx.createRadialGradient(v.x, v.y, 0, v.x, v.y, v.radius * v.life);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${v.life})`);
+          grad.addColorStop(0.5, `rgba(255, 215, 0, ${v.life * 0.5})`);
+          grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(v.x, v.y, v.radius, 0, Math.PI * 2);
+          ctx.fill();
         } else if (v.type === 'line') {
           ctx.strokeStyle = v.color;
-          ctx.lineWidth = 2.5 * v.life;
+          ctx.lineWidth = 4 * v.life;
           ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(v.x, v.y);
