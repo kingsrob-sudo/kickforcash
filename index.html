@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.9</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v10.0</div>
     </div>
   </div>
 
@@ -1074,7 +1074,7 @@
         clientY = e.clientY;
       }
       // Compensate for goal-layer parallax (0.5 rate on both axes) + camera zoom
-      const goalRate = 0.5;
+      const goalRate = 0.8;
       let gx = (clientX - rect.left) / scale - gyroX * BG_BLEED * goalRate;
       let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED * goalRate;
       if (camZoom !== 1.0) {
@@ -1777,8 +1777,8 @@
       // ── LAYERED PARALLAX ──
       // Three layers with different movement rates based on gyro
       const pX = gyroX * BG_BLEED;
-      const grassRate = 1.0;   // closest — full movement
-      const goalRate = 0.5;    // mid — half movement
+      const grassRate = 1.5;   // closest — moves most
+      const goalRate = 0.8;    // mid — moves more
       const standsRate = 0.15; // far — subtle movement
 
       // Camera chase zoom
@@ -1842,7 +1842,7 @@
 
       // ── BOTTOM BAR: grass overlay on top of gameplay (fixed, no parallax) ──
       if (bottomBarLoaded) {
-        ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y - 150, BG_W, BG_H);
+        ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
       }
 
       // Fallback if nothing loaded
