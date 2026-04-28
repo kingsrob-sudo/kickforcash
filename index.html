@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.1</div>
     </div>
   </div>
 
@@ -1052,10 +1052,10 @@
         clientX = e.clientX;
         clientY = e.clientY;
       }
-      // Convert screen coords to game coords, compensating for parallax + camera zoom
+      // Compensate for goal-layer parallax (0.5 rate) + camera zoom
+      const goalRate = 0.5;
       let gx = (clientX - rect.left) / scale - gyroX * BG_BLEED;
-      let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED;
-      // Undo camera zoom transform: translate(-center), scale(1/zoom), translate(center)
+      let gy = (clientY - rect.top) / scale - gyroY * BG_BLEED * goalRate;
       if (camZoom !== 1.0) {
         gx = (gx - camCenterX) / camZoom + camCenterX;
         gy = (gy - camCenterY) / camZoom + camCenterY;
@@ -1753,20 +1753,81 @@
       ctx.save();
       ctx.scale(scale, scale);
 
-      // Parallax: shift the scene based on gyro tilt
-      const parallaxX = gyroX * BG_BLEED;
-      const parallaxY = gyroY * BG_BLEED;
-      ctx.save();
-      ctx.translate(parallaxX, parallaxY);
+      // ── LAYERED PARALLAX ──
+      // Three layers with different movement rates based on gyro
+      // Grass (closest) moves most, goal (mid) moves medium, stands (far) moves least
+      // gyroY: positive = tilted forward (look down), negative = tilted back (look up)
+      const pX = gyroX * BG_BLEED;  // horizontal parallax stays uniform
+      const grassRate = 1.0;   // closest — full movement
+      const goalRate = 0.5;    // mid — half movement
+      const standsRate = 0.15; // far — subtle movement
 
-      // Camera chase: zoom centered on ball
-      if (camZoom !== 1.0) {
-        ctx.translate(camCenterX, camCenterY);
-        ctx.scale(camZoom, camZoom);
-        ctx.translate(-camCenterX, -camCenterY);
+      // Camera chase zoom (applied per-layer)
+      const cz = camZoom;
+      const cx = camCenterX;
+      const cy = camCenterY;
+
+      // Layer boundaries in image pixels (1280x2120 image)
+      // Stands: 0 → 550
+      // Goal: 550 → 1050
+      // Grass: 1050 → 2120
+      // In game coords (image is drawn at 640x1060 scale):
+      const imgScale = BG_W / 1280; // 0.5
+      const standsImgY = 0;
+      const standsImgH = 550;
+      const goalImgY = 550;
+      const goalImgH = 500;
+      const grassImgY = 1050;
+      const grassImgH = 1070;
+
+      // Game coord equivalents
+      const standsGameY = standsImgY * imgScale; // 0
+      const standsGameH = standsImgH * imgScale; // 275
+      const goalGameY = goalImgY * imgScale;     // 275
+      const goalGameH = goalImgH * imgScale;     // 250
+      const grassGameY = grassImgY * imgScale;   // 525
+      const grassGameH = grassImgH * imgScale;   // 535
+
+      if (bgLoaded) {
+        // ── LAYER 1: Stands/sky (far — moves least) ──
+        ctx.save();
+        ctx.translate(pX, gyroY * BG_BLEED * standsRate);
+        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+        ctx.drawImage(bgImage,
+          0, standsImgY, 1280, standsImgH,                           // source rect
+          -BG_BLEED, -BG_BLEED + standsGameY, BG_W, standsGameH     // dest rect
+        );
+        ctx.restore();
+
+        // ── LAYER 2: Goal (mid — medium movement) ──
+        ctx.save();
+        ctx.translate(pX, gyroY * BG_BLEED * goalRate);
+        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+        ctx.drawImage(bgImage,
+          0, goalImgY, 1280, goalImgH,
+          -BG_BLEED, -BG_BLEED + goalGameY, BG_W, goalGameH
+        );
+        ctx.restore();
+
+        // ── LAYER 3: Grass (closest — moves most) ──
+        ctx.save();
+        ctx.translate(pX, gyroY * BG_BLEED * grassRate);
+        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+        ctx.drawImage(bgImage,
+          0, grassImgY, 1280, grassImgH,
+          -BG_BLEED, -BG_BLEED + grassGameY, BG_W, grassGameH
+        );
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#1a3a1a';
+        ctx.fillRect(0, 0, GW, GH);
       }
 
-      drawBackground();
+      // ── GAME ELEMENTS — move with the goal layer rate ──
+      ctx.save();
+      ctx.translate(pX, gyroY * BG_BLEED * goalRate);
+      if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+
       drawBallShadow();
       drawDeadBalls();
       drawTargets();
@@ -1776,23 +1837,12 @@
       drawScorePopups();
       drawSwipeTrail();
 
-      ctx.restore(); // remove parallax + camera transforms
+      ctx.restore(); // remove game element transforms
 
-      // HUD drawn without parallax or camera — stays fixed on screen
+      // HUD drawn without any parallax or camera — stays fixed on screen
       drawHUD();
 
       ctx.restore(); // remove scale
-    }
-
-    function drawBackground() {
-      if (bgLoaded) {
-        // Draw at -BG_BLEED offset so it's centered at rest
-        // The ctx.translate in draw() handles the parallax shift
-        ctx.drawImage(bgImage, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
-      } else {
-        ctx.fillStyle = '#1a3a1a';
-        ctx.fillRect(0, 0, GW, GH);
-      }
     }
 
     function drawBallShadow() {
