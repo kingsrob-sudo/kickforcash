@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.3</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.4</div>
     </div>
   </div>
 
@@ -1778,10 +1778,13 @@
       const cx = camCenterX;
       const cy = camCenterY;
 
-      // Each layer is a full 740x1160 image, drawn at -BG_BLEED offset
-      // Transparency in goal.png and grass.png lets layers show through
+      // Draw order (back to front):
+      // 1. Background (stands/crowd) — furthest
+      // 2. Grass — in front of background
+      // 3. Goal posts/net — in front of grass
+      // 4. Ball & effects — on top of everything
 
-      // ── LAYER 1: Stands/sky (far — moves least) ──
+      // ── LAYER 1: Background (far — moves least) ──
       if (bgLayerLoaded) {
         ctx.save();
         ctx.translate(pX * standsRate, gyroY * BG_BLEED * standsRate);
@@ -1790,7 +1793,16 @@
         ctx.restore();
       }
 
-      // ── LAYER 2: Goal (mid — medium movement) ──
+      // ── LAYER 2: Grass (closest — moves most) ──
+      if (grassLayerLoaded) {
+        ctx.save();
+        ctx.translate(pX * grassRate, gyroY * BG_BLEED * grassRate);
+        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+        ctx.drawImage(grassLayer, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
+        ctx.restore();
+      }
+
+      // ── LAYER 3: Goal (mid — medium movement) ──
       if (goalLayerLoaded) {
         ctx.save();
         ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
@@ -1799,7 +1811,7 @@
         ctx.restore();
       }
 
-      // ── GAME ELEMENTS — move with the goal layer ──
+      // ── LAYER 4: Game elements — on top, move with goal layer ──
       ctx.save();
       ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
       if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
@@ -1814,15 +1826,6 @@
       drawSwipeTrail();
 
       ctx.restore();
-
-      // ── LAYER 3: Grass (closest — moves most, drawn ON TOP of game elements) ──
-      if (grassLayerLoaded) {
-        ctx.save();
-        ctx.translate(pX * grassRate, gyroY * BG_BLEED * grassRate);
-        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
-        ctx.drawImage(grassLayer, -BG_BLEED, -BG_BLEED, BG_W, BG_H);
-        ctx.restore();
-      }
 
       // Fallback if nothing loaded
       if (!bgLayerLoaded && !goalLayerLoaded && !grassLayerLoaded) {
