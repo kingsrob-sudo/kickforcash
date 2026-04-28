@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.6</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.8</div>
     </div>
   </div>
 
@@ -612,6 +612,12 @@
     grassLayer.src = 'grass.png';
     let grassLayerLoaded = false;
     grassLayer.onload = () => { grassLayerLoaded = true; };
+
+    // Bottom bar overlay (grass + TIME/SCORE labels, on top of gameplay)
+    const bottomBarLayer = new Image();
+    bottomBarLayer.src = 'bottomBar.png';
+    let bottomBarLoaded = false;
+    bottomBarLayer.onload = () => { bottomBarLoaded = true; };
 
     // All layers are 1480x2320 → 740x1160 in game coords
     // Viewport is 540x960
@@ -1025,7 +1031,7 @@
 
     // Score box position (top-right pill center) for the fly-to target
     const SCORE_BOX_X = GW - 95;
-    const SCORE_BOX_Y = GH - 100;
+    const SCORE_BOX_Y = GH - 180;
 
     function spawnScorePopup(startX, startY, points) {
       const holdX = GW / 2;
@@ -1795,10 +1801,17 @@
         ctx.restore();
       }
 
-      // ── LAYER 2: Grass (closest — moves most) ──
+      // ── LAYER 2: Grass (closest — rotates around ball kick point) ──
       if (grassLayerLoaded) {
         ctx.save();
-        ctx.translate(pX * grassRate, gyroY * BG_BLEED * grassRate);
+        // Rotate around the ball's home position (kick point)
+        const grassPivotX = ball.homeX;
+        const grassPivotY = ball.homeY;
+        const rotAngle = gyroX * 0.03; // subtle rotation from left/right tilt
+        ctx.translate(grassPivotX, grassPivotY);
+        ctx.rotate(rotAngle);
+        ctx.translate(-grassPivotX, -grassPivotY);
+        // Still apply camera chase zoom
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
         ctx.drawImage(grassLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
@@ -1829,13 +1842,18 @@
 
       ctx.restore();
 
+      // ── BOTTOM BAR: grass overlay on top of gameplay (fixed, no parallax) ──
+      if (bottomBarLoaded) {
+        ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
+      }
+
       // Fallback if nothing loaded
       if (!bgLayerLoaded && !goalLayerLoaded && !grassLayerLoaded) {
         ctx.fillStyle = '#1a3a1a';
         ctx.fillRect(0, 0, GW, GH);
       }
 
-      // HUD drawn without any parallax or camera — stays fixed on screen
+      // HUD drawn on top of everything
       drawHUD();
 
       ctx.restore(); // remove scale
@@ -2238,7 +2256,7 @@
       // ── TIMER (bottom-left) — no background, just the ring ──
       const ringR = 63;
       const ringX = 95;
-      const ringCY = GH - 100;
+      const ringCY = GH - 180;
       const progress = timeLeft / 60;
 
       // Dark backing circle for readability
@@ -2291,7 +2309,7 @@
 
       // ── SCORE (bottom-right) in circle with respawn timer drain ──
       const scoreX = GW - 95;
-      const scoreCY = GH - 100;
+      const scoreCY = GH - 180;
       const scoreR = 63;
 
       // Circle color based on multiplier state
