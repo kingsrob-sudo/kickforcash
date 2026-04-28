@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.8</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v9.9</div>
     </div>
   </div>
 
@@ -1801,28 +1801,26 @@
         ctx.restore();
       }
 
-      // ── LAYER 2: Grass (closest — rotates around ball kick point) ──
-      if (grassLayerLoaded) {
-        ctx.save();
-        // Rotate around the ball's home position (kick point)
-        const grassPivotX = ball.homeX;
-        const grassPivotY = ball.homeY;
-        const rotAngle = gyroX * 0.03; // subtle rotation from left/right tilt
-        ctx.translate(grassPivotX, grassPivotY);
-        ctx.rotate(rotAngle);
-        ctx.translate(-grassPivotX, -grassPivotY);
-        // Still apply camera chase zoom
-        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
-        ctx.drawImage(grassLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
-        ctx.restore();
-      }
-
-      // ── LAYER 3: Goal (mid — medium movement) ──
+      // ── LAYER 2: Goal (mid — medium movement) ──
       if (goalLayerLoaded) {
         ctx.save();
         ctx.translate(pX * goalRate, gyroY * BG_BLEED * goalRate);
         if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
         ctx.drawImage(goalLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
+        ctx.restore();
+      }
+
+      // ── LAYER 3: Grass (closest — on top of goal, rotates around ball kick point) ──
+      if (grassLayerLoaded) {
+        ctx.save();
+        const grassPivotX = ball.homeX;
+        const grassPivotY = ball.homeY;
+        const rotAngle = gyroX * 0.03;
+        ctx.translate(grassPivotX, grassPivotY);
+        ctx.rotate(rotAngle);
+        ctx.translate(-grassPivotX, -grassPivotY);
+        if (cz !== 1.0) { ctx.translate(cx, cy); ctx.scale(cz, cz); ctx.translate(-cx, -cy); }
+        ctx.drawImage(grassLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
         ctx.restore();
       }
 
@@ -1844,7 +1842,7 @@
 
       // ── BOTTOM BAR: grass overlay on top of gameplay (fixed, no parallax) ──
       if (bottomBarLoaded) {
-        ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y, BG_W, BG_H);
+        ctx.drawImage(bottomBarLayer, BG_OFFSET_X, BG_OFFSET_Y - 150, BG_W, BG_H);
       }
 
       // Fallback if nothing loaded
