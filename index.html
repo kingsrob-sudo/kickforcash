@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.7</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.8</div>
     </div>
   </div>
 
@@ -1475,7 +1475,7 @@
       }
 
       // Power from swipe SPEED (px/sec)
-      const power = Math.min(Math.max((swipeSpeed - 200) / 2000, 0.1), 1.5);
+      const power = Math.min(Math.max((swipeSpeed - 150) / 1200, 0.1), 1.5);
 
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
@@ -1490,14 +1490,14 @@
       ball.targetX = clampedX;
       ball.visibleHorizonY = horizonY;
 
-      // Depth (forward travel) — min speed raised so weak kicks reach goal
+      // Depth (forward travel)
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = (2.5 + power * 1.5) * 0.85;
+      ball.depthSpeed = (1.5 + power * 2.5) * 0.85;
 
-      // Arc (vertical) — capped max so strong kicks stay in goal
+      // Arc (vertical)
       ball.arcY = 0;
-      ball.arcVY = -(8 + Math.min(power, 1.0) * 3);
+      ball.arcVY = -(8 + power * 4);
 
       // State
       ball.flying = true;
@@ -1817,7 +1817,7 @@
         ball.depth += ball.depthSpeed * decel;
 
         // Arc physics: gravity pulls arcVY positive (downward)
-        const gravity = 0.15; // reduced so all kicks reach the goal
+        const gravity = 0.32;
         ball.arcVY += gravity;
         ball.arcY += ball.arcVY;  // arcY: negative = above ground, 0 = ground level
 
