@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.7</div>
     </div>
   </div>
 
@@ -1817,7 +1817,7 @@
         ball.depth += ball.depthSpeed * decel;
 
         // Arc physics: gravity pulls arcVY positive (downward)
-        const gravity = 0.272; // 15% slower to match longer flight
+        const gravity = 0.15; // reduced so all kicks reach the goal
         ball.arcVY += gravity;
         ball.arcY += ball.arcVY;  // arcY: negative = above ground, 0 = ground level
 
@@ -1989,6 +1989,7 @@
         spawnScorePopup(ball.x, ball.y, points);
         spawnParticles(ball.x, ball.y);
         screenShake = 1.0;
+        playHitSFX();
         goalieShotsLeft--;
         if (goalieShotsLeft <= 0) {
           setTimeout(() => deactivateGoalie(), 1000);
