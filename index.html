@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.4</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.5</div>
     </div>
   </div>
 
@@ -1555,20 +1555,20 @@
 
       const jumpDist = 110;
       switch(goalieJumpDir) {
-        case 1: // left1
-          goalieTargetX = goalieStartX - jumpDist * 0.7;
+        case 1: // left1 (further dive)
+          goalieTargetX = goalieStartX - jumpDist * 1.2;
           goalieTargetY = goalieStartY - 20;
           break;
-        case 2: // left2 (further)
-          goalieTargetX = goalieStartX - jumpDist * 1.2;
+        case 2: // left2 (shorter dive)
+          goalieTargetX = goalieStartX - jumpDist * 0.5;
           goalieTargetY = goalieStartY - 30;
           break;
-        case 3: // right1
-          goalieTargetX = goalieStartX + jumpDist * 0.7;
+        case 3: // right1 (further dive)
+          goalieTargetX = goalieStartX + jumpDist * 1.2;
           goalieTargetY = goalieStartY - 20;
           break;
-        case 4: // right2 (further)
-          goalieTargetX = goalieStartX + jumpDist * 1.2;
+        case 4: // right2 (shorter dive)
+          goalieTargetX = goalieStartX + jumpDist * 0.5;
           goalieTargetY = goalieStartY - 30;
           break;
       }
