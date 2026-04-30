@@ -638,16 +638,25 @@
     // ── CROWD AMBIENCE — loops during gameplay ──
     const crowdAudio = new Audio('crowdSounds.mp3');
     crowdAudio.loop = true;
-    crowdAudio.volume = 0.3;
+    crowdAudio.volume = 0; // MUTED FOR TESTING
     crowdAudio.preload = 'auto';
+
+    // Pause audio when phone sleeps / tab hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        crowdAudio.pause();
+      } else if (gameState === 'playing' || gameState === 'intro') {
+        crowdAudio.play().catch(() => {});
+      }
+    });
 
     // ── SOUND EFFECTS ──
     const kickSFX = new Audio('kick.mp3');
-    kickSFX.volume = 0.6;
+    kickSFX.volume = 1.0;
     kickSFX.preload = 'auto';
 
     const hitSFX = new Audio('targetHit.mp3');
-    hitSFX.volume = 0.7;
+    hitSFX.volume = 1.0;
     hitSFX.preload = 'auto';
 
     function playKickSFX() {
