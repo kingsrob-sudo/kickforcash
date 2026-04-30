@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.3</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.4</div>
     </div>
   </div>
 
@@ -1500,7 +1500,7 @@
     // ── GOALIE SYSTEM ──
     let goalieActive = false;
     let goalieTimer = 0;          // frames remaining in goalie phase (10 seconds)
-    const GOALIE_DURATION = 600;  // 10 seconds at 60fps
+    const GOALIE_DURATION = 900;  // 15 seconds at 60fps
     let goalieX = GW / 2;
     let goalieY = goal.y + goal.height - 35;
     let goalieState = 'ready';    // 'ready' | 'jumping'
@@ -1584,22 +1584,35 @@
       }
 
       if (goalieState === 'jumping') {
-        goalieJumpT += 0.06;
+        goalieJumpT += 0.03; // slower acceleration
         if (goalieJumpT >= 1) {
           goalieJumpT = 1;
-          // Reset to ready after a pause
+          // Pause at full extension, then return to center
           setTimeout(() => {
             if (goalieActive) {
-              goalieState = 'ready';
-              goalieFrame = 0;
-              goalieX = GW / 2;
-              goalieY = goal.y + goal.height - 35;
+              goalieState = 'returning';
+              goalieJumpT = 0;
+              goalieStartX = goalieX;
+              goalieStartY = goalieY;
             }
-          }, 400);
+          }, 300);
         } else {
-          const eased = 1 - Math.pow(1 - goalieJumpT, 3);
+          const eased = 1 - Math.pow(1 - goalieJumpT, 2); // softer ease
           goalieX = goalieStartX + (goalieTargetX - goalieStartX) * eased;
           goalieY = goalieStartY + (goalieTargetY - goalieStartY) * eased;
+        }
+      } else if (goalieState === 'returning') {
+        goalieJumpT += 0.12; // quick zip back
+        if (goalieJumpT >= 1) {
+          goalieJumpT = 1;
+          goalieState = 'ready';
+          goalieFrame = 0; // back to idle
+          goalieX = GW / 2;
+          goalieY = goal.y + goal.height - 35;
+        } else {
+          const eased = 1 - Math.pow(1 - goalieJumpT, 3);
+          goalieX = goalieStartX + (GW / 2 - goalieStartX) * eased;
+          goalieY = goalieStartY + ((goal.y + goal.height - 35) - goalieStartY) * eased;
         }
       }
     }
