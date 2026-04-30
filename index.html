@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.7</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.8</div>
     </div>
   </div>
 
@@ -660,13 +660,23 @@
     hitSFX.preload = 'auto';
 
     function playKickSFX() {
-      kickSFX.currentTime = 0;
-      kickSFX.play().catch(() => {});
+      try {
+        const sfx = kickSFX.cloneNode();
+        sfx.volume = 1.0;
+        sfx.play().catch(e => console.warn('Kick SFX failed:', e));
+      } catch(e) {
+        console.warn('Kick SFX error:', e);
+      }
     }
 
     function playHitSFX() {
-      hitSFX.currentTime = 0;
-      hitSFX.play().catch(() => {});
+      try {
+        const sfx = hitSFX.cloneNode();
+        sfx.volume = 1.0;
+        sfx.play().catch(e => console.warn('Hit SFX failed:', e));
+      } catch(e) {
+        console.warn('Hit SFX error:', e);
+      }
     }
 
     // All layers are 1480x2320 → 740x1160 in game coords
