@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.3</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.5</div>
     </div>
   </div>
 
@@ -1474,17 +1474,15 @@
         });
       }
 
-      // Power from swipe SPEED — tightly clamped so all kicks reach the goal
-      // Slow swipe = low in goal, fast swipe = high in goal, but nothing undershoots or overshoots
-      const rawPower = Math.max((swipeSpeed - 200) / 2000, 0);
-      const power = 0.4 + Math.min(rawPower, 1.0) * 0.4; // range: 0.4 to 0.8
+      // Power from swipe SPEED (px/sec)
+      const power = Math.min(Math.max((swipeSpeed - 200) / 2000, 0.1), 1.5);
 
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
       const horizonY = goal.y + goal.height;
 
-      // Total depth — consistent, every kick reaches the goal
-      const totalDepth = (ball.homeY - horizonY) + 150;
+      // Total depth the ball must travel
+      const totalDepth = (ball.homeY - horizonY) + 400;
 
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
@@ -1492,14 +1490,14 @@
       ball.targetX = clampedX;
       ball.visibleHorizonY = horizonY;
 
-      // Depth (forward travel) — fast enough to always reach goal
+      // Depth (forward travel) — min speed raised so weak kicks reach goal
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = 4.0; // fixed, guaranteed to reach goal
+      ball.depthSpeed = (2.5 + power * 1.5) * 0.85;
 
-      // Arc (vertical) — power controls height within the goal frame
+      // Arc (vertical) — capped max so strong kicks stay in goal
       ball.arcY = 0;
-      ball.arcVY = -(6 + power * 5); // range: -8 (low) to -10 (high)
+      ball.arcVY = -(8 + Math.min(power, 1.0) * 3);
 
       // State
       ball.flying = true;
