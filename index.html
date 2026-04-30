@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.9</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.1</div>
     </div>
   </div>
 
@@ -640,6 +640,25 @@
     crowdAudio.loop = true;
     crowdAudio.volume = 0.3;
     crowdAudio.preload = 'auto';
+
+    // ── SOUND EFFECTS ──
+    const kickSFX = new Audio('kick.mp3');
+    kickSFX.volume = 0.6;
+    kickSFX.preload = 'auto';
+
+    const hitSFX = new Audio('targetHit.mp3');
+    hitSFX.volume = 0.7;
+    hitSFX.preload = 'auto';
+
+    function playKickSFX() {
+      kickSFX.currentTime = 0;
+      kickSFX.play().catch(() => {});
+    }
+
+    function playHitSFX() {
+      hitSFX.currentTime = 0;
+      hitSFX.play().catch(() => {});
+    }
 
     // All layers are 1480x2320 → 740x1160 in game coords
     // Viewport is 540x960
@@ -1442,6 +1461,7 @@
 
       // Impact VFX at ball position
       spawnImpactVFX(ball.homeX, ball.homeY);
+      playKickSFX();
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1942,7 +1962,8 @@
           score += 0; // score added when popup reaches the score box
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y, points);
-          screenShake = 1.0; // trigger screenshake
+          screenShake = 1.0;
+          playHitSFX(); // trigger screenshake
 
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
