@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.6</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.7</div>
     </div>
   </div>
 
@@ -638,7 +638,7 @@
     // ── CROWD AMBIENCE — loops during gameplay ──
     const crowdAudio = new Audio('crowdSounds.mp3');
     crowdAudio.loop = true;
-    crowdAudio.volume = 0; // MUTED FOR TESTING
+    crowdAudio.volume = 0.1; // MUTED FOR TESTING
     crowdAudio.preload = 'auto';
 
     // Pause audio when phone sleeps / tab hidden
@@ -1654,17 +1654,7 @@
         sx, 0, GOALIE_CELL_W, GOALIE_CELL_H,
         goalieX - drawW / 2, goalieY - drawH / 2 + goalieEntranceY, drawW, drawH
       );
-
-      // "5X" text above goalie
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 6;
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 24px Impact';
-      ctx.textAlign = 'center';
-      ctx.fillText('5X GOALIE', GW / 2, goal.y - 25 + goalieEntranceY);
-      ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
-
       ctx.restore();
     }
 
@@ -1730,11 +1720,11 @@
 
       // Fade out crowd audio
       const fadeAudio = setInterval(() => {
-        if (crowdAudio.volume > 0.05) {
-          crowdAudio.volume -= 0.05;
+        if (crowdAudio.volume > 0.02) {
+          crowdAudio.volume -= 0.02;
         } else {
           crowdAudio.pause();
-          crowdAudio.volume = 0;
+          crowdAudio.volume = 0.1;
           clearInterval(fadeAudio);
         }
       }, 100);
@@ -3133,7 +3123,7 @@
 
       // Pre-init crowd audio so it's ready to start instantly
       crowdAudio.load();
-      crowdAudio.volume = 0;
+      crowdAudio.volume = 0.1;
 
       // Start crowd audio near the end of the video for seamless crossfade
       let crowdStarted = false;
@@ -3141,14 +3131,14 @@
         if (!crowdStarted && introVideo.duration && introVideo.currentTime >= introVideo.duration - 0.3) {
           crowdStarted = true;
           crowdAudio.currentTime = 0;
-          crowdAudio.volume = 0;
+          crowdAudio.volume = 0.1;
           crowdAudio.play().catch(() => {});
           // Quick fade in
           const fadeIn = setInterval(() => {
-            if (crowdAudio.volume < 0.28) {
-              crowdAudio.volume = Math.min(0, crowdAudio.volume + 0.05);
+            if (crowdAudio.volume < 0.08) {
+              crowdAudio.volume = Math.min(0.1, crowdAudio.volume + 0.02);
             } else {
-              crowdAudio.volume = 0;
+              crowdAudio.volume = 0.1;
               clearInterval(fadeIn);
             }
           }, 50);
@@ -3184,7 +3174,7 @@
     document.getElementById('startBtn').addEventListener('click', () => {
       requestGyro();
       crowdAudio.currentTime = 0;
-      crowdAudio.volume = 0;
+      crowdAudio.volume = 0.1;
       crowdAudio.play().catch(() => {});
       startGame();
     });
