@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.2</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.3</div>
     </div>
   </div>
 
@@ -1365,6 +1365,10 @@
 
       // Delay ball launch to sync with foot contact (frame 3 of kick anim)
       const contactDelay = KICK_FRAME_DURATION * 2.5 * (1000 / 60); // ~167ms
+      // Play kick SFX 100ms before ball launches
+      setTimeout(() => {
+        playKickSFX();
+      }, Math.max(0, contactDelay - 100));
       setTimeout(() => {
         fireKick(dx, dy, swipeSpeed, spinDeviation);
       }, contactDelay);
@@ -1461,7 +1465,6 @@
 
       // Impact VFX at ball position
       spawnImpactVFX(ball.homeX, ball.homeY);
-      playKickSFX();
       ball.spin = spinAmount;
       ball.rotation = 0;
       ball.rotationSpeed = spinAmount * 0.12;
@@ -1490,7 +1493,7 @@
     let goalieTimer = 0;          // frames remaining in goalie phase (10 seconds)
     const GOALIE_DURATION = 600;  // 10 seconds at 60fps
     let goalieX = GW / 2;
-    let goalieY = goal.y + goal.height * 0.5;
+    let goalieY = goal.y + goal.height - 35;
     let goalieState = 'ready';    // 'ready' | 'jumping'
     let goalieJumpDir = 0;        // 0=idle, 1=left1, 2=left2, 3=right1, 4=right2
     let goalieJumpT = 0;
@@ -1515,7 +1518,7 @@
       goalieState = 'ready';
       goalieFrame = 0; // idle
       goalieX = GW / 2;
-      goalieY = goal.y + goal.height * 0.5;
+      goalieY = goal.y + goal.height - 35;
       goalieJumpT = 0;
       goalieShotsLeft = 3;
       targetRespawnTimer = 0;
@@ -1539,7 +1542,7 @@
       goalieState = 'jumping';
       goalieJumpT = 0;
       goalieStartX = GW / 2;
-      goalieStartY = goal.y + goal.height * 0.5;
+      goalieStartY = goal.y + goal.height - 35;
 
       const jumpDist = 110;
       switch(goalieJumpDir) {
@@ -1581,7 +1584,7 @@
               goalieState = 'ready';
               goalieFrame = 0;
               goalieX = GW / 2;
-              goalieY = goal.y + goal.height * 0.5;
+              goalieY = goal.y + goal.height - 35;
             }
           }, 400);
         } else {
@@ -1959,7 +1962,7 @@
           spawnParticles(t.x, t.y);
           spawnScorePopup(t.x, t.y, points);
           screenShake = 1.0;
-          playHitSFX(); // trigger screenshake
+          playHitSFX();
 
           // Bounce off target — random scatter angle
           if (ball.phase === 'flight') {
