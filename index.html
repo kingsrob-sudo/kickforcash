@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.6</div>
     </div>
   </div>
 
@@ -1524,11 +1524,13 @@
     function activateGoalie() {
       goalieActive = true;
       goalieTimer = GOALIE_DURATION;
-      goalieState = 'ready';
+      goalieState = 'entering';
       goalieFrame = 0; // idle
       goalieX = GW / 2;
       goalieY = goal.y + goal.height - 35;
       goalieJumpT = 0;
+      goalieAlpha = 0;
+      goalieEntranceY = -80;
       goalieShotsLeft = 3;
       targetRespawnTimer = 0;
       for (const t of targets) {
@@ -1574,6 +1576,9 @@
       }
     }
 
+    let goalieAlpha = 0;         // for fade in/out
+    let goalieEntranceY = 0;     // offset for drop-in entrance
+
     function updateGoalie() {
       if (!goalieActive) return;
 
@@ -1583,53 +1588,71 @@
         return;
       }
 
-      if (goalieState === 'jumping') {
-        goalieJumpT += 0.03; // slower acceleration
-        if (goalieJumpT >= 1) {
-          goalieJumpT = 1;
-          // Pause at full extension, then return to center
-          setTimeout(() => {
-            if (goalieActive) {
-              goalieState = 'returning';
-              goalieJumpT = 0;
-              goalieStartX = goalieX;
-              goalieStartY = goalieY;
-            }
-          }, 300);
-        } else {
-          const eased = 1 - Math.pow(1 - goalieJumpT, 2); // softer ease
-          goalieX = goalieStartX + (goalieTargetX - goalieStartX) * eased;
-          goalieY = goalieStartY + (goalieTargetY - goalieStartY) * eased;
-        }
-      } else if (goalieState === 'returning') {
-        goalieJumpT += 0.12; // quick zip back
+      if (goalieState === 'entering') {
+        // Drop in from above + fade in
+        goalieJumpT += 0.04;
         if (goalieJumpT >= 1) {
           goalieJumpT = 1;
           goalieState = 'ready';
-          goalieFrame = 0; // back to idle
-          goalieX = GW / 2;
-          goalieY = goal.y + goal.height - 35;
+          goalieAlpha = 1;
+          goalieEntranceY = 0;
         } else {
           const eased = 1 - Math.pow(1 - goalieJumpT, 3);
-          goalieX = goalieStartX + (GW / 2 - goalieStartX) * eased;
-          goalieY = goalieStartY + ((goal.y + goal.height - 35) - goalieStartY) * eased;
+          goalieAlpha = eased;
+          goalieEntranceY = -80 * (1 - eased); // drops from 80px above
+        }
+      } else if (goalieState === 'jumping') {
+        goalieJumpT += 0.03;
+        if (goalieJumpT >= 1) {
+          goalieJumpT = 1;
+          // Pause at full extension, then fade out
+          setTimeout(() => {
+            if (goalieActive) {
+              goalieState = 'fadeout';
+              goalieJumpT = 0;
+            }
+          }, 300);
+        } else {
+          const eased = 1 - Math.pow(1 - goalieJumpT, 2);
+          goalieX = goalieStartX + (goalieTargetX - goalieStartX) * eased;
+          goalieY = goalieStartY + (goalieTargetY - goalieStartY) * eased;
+        }
+      } else if (goalieState === 'fadeout') {
+        goalieJumpT += 0.08;
+        goalieAlpha = Math.max(0, 1 - goalieJumpT);
+        if (goalieJumpT >= 1) {
+          // Reset to center, then fade back in
+          goalieX = GW / 2;
+          goalieY = goal.y + goal.height - 35;
+          goalieFrame = 0;
+          goalieState = 'fadein';
+          goalieJumpT = 0;
+        }
+      } else if (goalieState === 'fadein') {
+        goalieJumpT += 0.08;
+        goalieAlpha = Math.min(1, goalieJumpT);
+        if (goalieJumpT >= 1) {
+          goalieAlpha = 1;
+          goalieState = 'ready';
         }
       }
     }
 
     function drawGoalie() {
       if (!goalieActive || !goalieSheetLoaded) return;
+      if (goalieAlpha <= 0) return;
 
       const sx = goalieFrame * GOALIE_CELL_W;
-      const drawScale = 0.55; // adjust to fit in goal
+      const drawScale = 0.55;
       const drawW = GOALIE_CELL_W * drawScale;
       const drawH = GOALIE_CELL_H * drawScale;
 
       ctx.save();
+      ctx.globalAlpha = goalieAlpha;
       ctx.drawImage(
         goalieSheet,
         sx, 0, GOALIE_CELL_W, GOALIE_CELL_H,
-        goalieX - drawW / 2, goalieY - drawH / 2, drawW, drawH
+        goalieX - drawW / 2, goalieY - drawH / 2 + goalieEntranceY, drawW, drawH
       );
 
       // "5X" text above goalie
@@ -1638,8 +1661,9 @@
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 24px Impact';
       ctx.textAlign = 'center';
-      ctx.fillText('5X GOALIE', GW / 2, goal.y - 25);
+      ctx.fillText('5X GOALIE', GW / 2, goal.y - 25 + goalieEntranceY);
       ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
 
       ctx.restore();
     }
@@ -1710,7 +1734,7 @@
           crowdAudio.volume -= 0.05;
         } else {
           crowdAudio.pause();
-          crowdAudio.volume = 0.3;
+          crowdAudio.volume = 0;
           clearInterval(fadeAudio);
         }
       }, 100);
@@ -3122,9 +3146,9 @@
           // Quick fade in
           const fadeIn = setInterval(() => {
             if (crowdAudio.volume < 0.28) {
-              crowdAudio.volume = Math.min(0.3, crowdAudio.volume + 0.05);
+              crowdAudio.volume = Math.min(0, crowdAudio.volume + 0.05);
             } else {
-              crowdAudio.volume = 0.3;
+              crowdAudio.volume = 0;
               clearInterval(fadeIn);
             }
           }, 50);
@@ -3160,7 +3184,7 @@
     document.getElementById('startBtn').addEventListener('click', () => {
       requestGyro();
       crowdAudio.currentTime = 0;
-      crowdAudio.volume = 0.3;
+      crowdAudio.volume = 0;
       crowdAudio.play().catch(() => {});
       startGame();
     });
