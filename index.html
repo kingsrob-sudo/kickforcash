@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.5</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.8</div>
     </div>
   </div>
 
@@ -618,6 +618,28 @@
     bottomBarLayer.src = 'bottomBar.png';
     let bottomBarLoaded = false;
     bottomBarLayer.onload = () => { bottomBarLoaded = true; };
+
+    // ── INTRO VIDEO — preloads during registration ──
+    const introVideo = document.createElement('video');
+    introVideo.src = 'introAnimation.mp4';
+    introVideo.playsInline = true;
+    introVideo.muted = false;
+    introVideo.preload = 'auto';
+    introVideo.style.cssText = 'position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:430px; height:100%; max-height:764px; object-fit:cover; z-index:150; display:none;';
+    document.body.appendChild(introVideo);
+
+    // Match desktop preview framing
+    if (window.innerWidth > 430) {
+      introVideo.style.top = '50%';
+      introVideo.style.transform = 'translate(-50%, -50%)';
+      introVideo.style.borderRadius = '20px';
+    }
+
+    // ── CROWD AMBIENCE — loops during gameplay ──
+    const crowdAudio = new Audio('crowdSounds.mp3');
+    crowdAudio.loop = true;
+    crowdAudio.volume = 0.3;
+    crowdAudio.preload = 'auto';
 
     // All layers are 1480x2320 → 740x1160 in game coords
     // Viewport is 540x960
@@ -901,7 +923,7 @@
 
         } else if (alive === 2) {
           // ── MEDIUM BOUNCE: move and bounce off walls and each other ──
-          const speed = 1.5;
+          const speed = 1.0;
 
           // Initialize velocity if zero
           if (t.vx === 0 && t.vy === 0) {
@@ -927,8 +949,8 @@
           if (t.y + t.radius > TGT_BOTTOM) { t.y = TGT_BOTTOM - t.radius; t.vy = -Math.abs(t.vy); }
 
         } else if (alive === 1) {
-          // ── FAST ERRATIC: fast bouncing inside goal ──
-          const speed = 3;
+          // ── FAST ERRATIC: bouncing inside goal (slowed for goalie access) ──
+          const speed = 2.0;
 
           if (t.vx === 0 && t.vy === 0) {
             const angle = Math.random() * Math.PI * 2;
@@ -1017,19 +1039,16 @@
     }
 
     function onTargetHit() {
-      // Reset respawn timer on every hit
       targetRespawnTimer = 0;
 
       const alive = getAliveCount();
 
       if (alive === 0) {
-        // All targets down — full respawn after delay
+        // All targets down — activate goalie phase!
         setTimeout(() => {
-          if (gameState === 'playing') spawnTargets();
+          if (gameState === 'playing') activateGoalie();
         }, 600);
       }
-      // Otherwise the state machine naturally handles
-      // 3→2 (start moving), 2→1 (go fast), via alive count
     }
 
     // Particles for hit effects
@@ -1436,6 +1455,163 @@
     // ============================================================
     // GAME LOGIC
     // ============================================================
+    // ── INTRO SEQUENCE: UI → targets → ball animate in ──
+    let introPhase = 'none'; // 'none' | 'video' | 'ui' | 'targets' | 'ball' | 'done'
+    let introTimer = 0;
+    let introUIAlpha = 0;    // HUD fade-in
+    let showHUD = false;
+    let showTargets = false;
+    let showBall = false;
+
+    // ── GOALIE SYSTEM ──
+    let goalieActive = false;
+    let goalieTimer = 0;          // frames remaining in goalie phase (10 seconds)
+    const GOALIE_DURATION = 600;  // 10 seconds at 60fps
+    let goalieX = GW / 2;
+    let goalieY = goal.y + goal.height * 0.5;
+    let goalieState = 'ready';    // 'ready' | 'jumping' | 'blocked' | 'scored'
+    let goalieJumpDir = 0;        // 0=center, 1=left, 2=right, 3=up-left, 4=up-right
+    let goalieJumpT = 0;
+    let goalieStartX = 0;
+    let goalieStartY = 0;
+    let goalieTargetX = 0;
+    let goalieTargetY = 0;
+    let goalieShotsLeft = 3;
+
+    // Goalie sprite (placeholder — will be replaced with sprite sheet)
+    const goalieImg = new Image();
+    goalieImg.src = 'goalie.png';
+    let goalieImgLoaded = false;
+    goalieImg.onload = () => { goalieImgLoaded = true; };
+
+    function activateGoalie() {
+      goalieActive = true;
+      goalieTimer = GOALIE_DURATION;
+      goalieState = 'ready';
+      goalieX = GW / 2;
+      goalieY = goal.y + goal.height * 0.5;
+      goalieJumpT = 0;
+      goalieShotsLeft = 3;
+      // Hide targets during goalie phase
+      for (const t of targets) {
+        t.alive = false;
+        t.hitAnim = 0;
+      }
+    }
+
+    function deactivateGoalie() {
+      goalieActive = false;
+      goalieTimer = 0;
+      // Respawn all targets
+      spawnTargets();
+    }
+
+    function goalieChooseJump() {
+      // Random direction: 0=center, 1=left, 2=right, 3=up-left, 4=up-right
+      goalieJumpDir = Math.floor(Math.random() * 5);
+      goalieState = 'jumping';
+      goalieJumpT = 0;
+      goalieStartX = GW / 2;
+      goalieStartY = goal.y + goal.height * 0.5;
+
+      const jumpDist = 100;
+      switch(goalieJumpDir) {
+        case 0: // center — stays put
+          goalieTargetX = goalieStartX;
+          goalieTargetY = goalieStartY - 30;
+          break;
+        case 1: // left
+          goalieTargetX = goalieStartX - jumpDist;
+          goalieTargetY = goalieStartY;
+          break;
+        case 2: // right
+          goalieTargetX = goalieStartX + jumpDist;
+          goalieTargetY = goalieStartY;
+          break;
+        case 3: // up-left
+          goalieTargetX = goalieStartX - jumpDist * 0.7;
+          goalieTargetY = goalieStartY - jumpDist * 0.5;
+          break;
+        case 4: // up-right
+          goalieTargetX = goalieStartX + jumpDist * 0.7;
+          goalieTargetY = goalieStartY - jumpDist * 0.5;
+          break;
+      }
+    }
+
+    function updateGoalie() {
+      if (!goalieActive) return;
+
+      goalieTimer--;
+      if (goalieTimer <= 0) {
+        deactivateGoalie();
+        return;
+      }
+
+      if (goalieState === 'jumping') {
+        goalieJumpT += 0.08;
+        if (goalieJumpT >= 1) {
+          goalieJumpT = 1;
+          // Check if goalie blocked the ball
+          goalieState = 'ready';
+          goalieX = GW / 2;
+          goalieY = goal.y + goal.height * 0.5;
+        } else {
+          const eased = 1 - Math.pow(1 - goalieJumpT, 3);
+          goalieX = goalieStartX + (goalieTargetX - goalieStartX) * eased;
+          goalieY = goalieStartY + (goalieTargetY - goalieStartY) * eased;
+        }
+      }
+    }
+
+    function drawGoalie() {
+      if (!goalieActive) return;
+
+      // Draw goalie as a colored rectangle placeholder until sprite is ready
+      const gw = 60;
+      const gh = 80;
+
+      ctx.save();
+      ctx.fillStyle = '#FF6600';
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(goalieX - gw/2, goalieY - gh/2, gw, gh);
+
+      // Jersey number
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px Impact';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GK', goalieX, goalieY);
+      ctx.globalAlpha = 1;
+
+      // Timer bar above goal
+      const timerPct = goalieTimer / GOALIE_DURATION;
+      const barW = goal.width * 0.8;
+      const barX = goal.x + (goal.width - barW) / 2;
+      const barY = goal.y - 20;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(barX, barY, barW, 8);
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(barX, barY, barW * timerPct, 8);
+
+      // "5X BONUS" text
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 28px Impact';
+      ctx.textAlign = 'center';
+      ctx.fillText('5X GOALIE', GW / 2, goal.y - 35);
+      ctx.shadowBlur = 0;
+
+      ctx.restore();
+    }
+
+    function checkGoalieBlock(ballX, ballY) {
+      if (!goalieActive || goalieState !== 'jumping') return false;
+      const dist = distTo(ballX, ballY, goalieX, goalieY);
+      return dist < 60; // goalie block radius
+    }
+
     function startGame() {
       score = 0;
       scoreCountTarget = 0;
@@ -1458,34 +1634,45 @@
       particles = [];
       scorePopups = [];
       deadBalls = [];
-      spawnTargets();
-      gameState = 'playing';
+      impactVFX = [];
+      goalieActive = false;
 
       // Show the canvas
       canvas.style.display = 'block';
-
-      // Entrance animation
-      ball.entering = true;
-      ball.enterT = 0;
-      ball.flying = false;
 
       document.getElementById('startScreen').classList.remove('active');
       document.getElementById('startScreen').classList.add('hidden');
       document.getElementById('endScreen').classList.remove('active');
 
-      timerInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft <= 0) {
-          timeLeft = 0;
-          endGame();
-        }
-      }, 1000);
+      // ── INTRO SEQUENCE: ball already in place, animate in UI → targets ──
+      introPhase = 'ui';
+      introTimer = 0;
+      introUIAlpha = 0;
+      showHUD = false;
+      showTargets = false;
+      showBall = true; // ball visible from the start
+      ball.y = ball.homeY; // already in position
+      ball.entering = false;
+      gameState = 'intro';
+
+      // Don't start timer yet — wait for intro to finish
     }
 
     function endGame() {
       gameState = 'ended';
       clearInterval(timerInterval);
       document.getElementById('finalScore').textContent = score;
+
+      // Fade out crowd audio
+      const fadeAudio = setInterval(() => {
+        if (crowdAudio.volume > 0.05) {
+          crowdAudio.volume -= 0.05;
+        } else {
+          crowdAudio.pause();
+          crowdAudio.volume = 0.3;
+          clearInterval(fadeAudio);
+        }
+      }, 100);
 
       // Show ad interstitial first
       document.getElementById('adScreen').classList.add('active');
@@ -1573,6 +1760,7 @@
 
         // ── COLLISION CHECKS ──
         checkTargetCollisions();
+        checkGoalieCollision();
         checkPostCollisions();
 
         // ── NET WALL: ball reached back of net AND is descending? ──
@@ -1667,6 +1855,56 @@
 
         checkPostCollisions();
         checkSideWallCollisions();
+      }
+    }
+
+    function checkGoalieCollision() {
+      if (!goalieActive) return;
+      if (ball.phase !== 'flight') return;
+      if (ball.hitTarget) return;
+
+      const visibleDepth = ball.homeY - ball.visibleHorizonY;
+      if (ball.depth < visibleDepth * 0.6) return;
+      if (ball.arcVY < 0) return;
+
+      // When ball reaches goal depth during goalie phase, goalie jumps
+      if (goalieState === 'ready' && ball.depth > visibleDepth * 0.65) {
+        goalieChooseJump();
+      }
+
+      // Check if goalie blocks
+      if (goalieState === 'jumping') {
+        const dist = distTo(ball.x, ball.y, goalieX, goalieY);
+        if (dist < 70) {
+          // BLOCKED! Deflect ball
+          ball.hitTarget = true;
+          ball.phase = 'bounce';
+          ball.bounceGroundY = ball.visibleHorizonY;
+          ball.arcY = ball.y - ball.visibleHorizonY;
+          ball.bounceVY = -5;
+          ball.bounceVX = (Math.random() - 0.5) * 8;
+          spawnParticles(ball.x, ball.y);
+          screenShake = 0.5;
+          goalieShotsLeft--;
+          if (goalieShotsLeft <= 0) {
+            setTimeout(() => deactivateGoalie(), 1000);
+          }
+          return;
+        }
+      }
+
+      // Ball got past goalie — GOAL! 5x points
+      if (ball.depth > visibleDepth * 0.8 && !ball.hitTarget) {
+        ball.hitTarget = true;
+        const basePoints = 100;
+        const points = basePoints * 5;
+        spawnScorePopup(ball.x, ball.y, points);
+        spawnParticles(ball.x, ball.y);
+        screenShake = 1.0;
+        goalieShotsLeft--;
+        if (goalieShotsLeft <= 0) {
+          setTimeout(() => deactivateGoalie(), 1000);
+        }
       }
     }
 
@@ -2024,10 +2262,11 @@
 
       drawBallShadow();
       drawDeadBalls();
-      drawTargets();
+      if (showTargets || gameState === 'playing') drawTargets();
+      drawGoalie();
       drawParticles();
       drawBallTrail();
-      drawBall();
+      if (showBall || gameState === 'playing') drawBall();
       drawImpactVFX();
       drawScorePopups();
       drawSwipeTrail();
@@ -2048,8 +2287,14 @@
         ctx.fillRect(0, 0, GW, GH);
       }
 
-      // HUD drawn on top of everything
-      drawHUD();
+      // HUD drawn on top of everything — fade in during intro
+      if (showHUD || gameState === 'playing') {
+        if (gameState === 'intro') {
+          ctx.globalAlpha = introUIAlpha;
+        }
+        drawHUD();
+        ctx.globalAlpha = 1;
+      }
 
       ctx.restore(); // remove scale
     }
@@ -2627,20 +2872,57 @@
     // GAME LOOP
     // ============================================================
     function loop() {
+      // ── INTRO SEQUENCE ──
+      if (gameState === 'intro') {
+        introTimer++;
+
+        if (introPhase === 'ui') {
+          // Fade in HUD over 30 frames
+          introUIAlpha = Math.min(1, introTimer / 30);
+          showHUD = true;
+          if (introTimer >= 40) {
+            introPhase = 'targets';
+            introTimer = 0;
+            showTargets = true;
+            spawnTargets();
+          }
+        } else if (introPhase === 'targets') {
+          // Targets animate in via their entrance animation
+          if (introTimer >= 50) {
+            introPhase = 'done';
+            gameState = 'playing';
+            // Start the game timer
+            timerInterval = setInterval(() => {
+              timeLeft--;
+              if (timeLeft <= 0) {
+                timeLeft = 0;
+                endGame();
+              }
+            }, 1000);
+          }
+        }
+
+        // Still update target entrance animations during intro
+        for (const t of targets) {
+          if (t.enterT < 1) {
+            t.enterT += 0.04;
+            if (t.enterT > 1) t.enterT = 1;
+          }
+        }
+      }
+
       if (gameState === 'playing') {
         // Entrance animation — ball rolls up from bottom
         if (ball.entering) {
-          ball.enterT += 0.06; // faster entrance ~1.5s
+          ball.enterT += 0.06;
           if (ball.enterT >= 1) {
             ball.enterT = 1;
             ball.entering = false;
             ball.y = ball.homeY;
           } else {
-            // Ease-out: fast start, gentle settle
             const eased = 1 - Math.pow(1 - ball.enterT, 3);
             const startY = GH + 80;
             ball.y = startY + (ball.homeY - startY) * eased;
-            // Roll the sprite frames during entrance
             ballFrameAccum += 0.8;
             if (ballFrameAccum >= 1) {
               ballFrame = (ballFrame + 1) % SPRITE_TOTAL;
@@ -2663,6 +2945,7 @@
         }
         // Update target movement and respawn timer
         updateTargets();
+        updateGoalie();
         // Update camera chase
         updateCamera();
         // Remove dead balls older than 4 seconds
@@ -2770,9 +3053,27 @@
         terms_accepted: termsCheck.checked,
       });
 
-      // Hide registration, skip play screen, go straight to game
+      // Hide registration screen
       document.getElementById('registerScreen').classList.remove('active');
-      startGame();
+
+      // Show and play intro video
+      introVideo.style.display = 'block';
+      introVideo.currentTime = 0;
+      introVideo.play().catch(e => {
+        console.log('Intro video play failed:', e);
+        // Fallback: skip video, go straight to game
+        introVideo.style.display = 'none';
+        startGame();
+      });
+
+      // Start crowd audio (needs user gesture)
+      crowdAudio.play().catch(() => {});
+
+      // When video ends, seamlessly transition to gameplay
+      introVideo.onended = () => {
+        introVideo.style.display = 'none';
+        startGame();
+      };
     });
 
     // ============================================================
