@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.1</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.2</div>
     </div>
   </div>
 
@@ -1482,6 +1482,8 @@
     let showHUD = false;
     let showTargets = false;
     let showBall = false;
+    let hudSlideLeft = -200;  // timer circle X offset (slides in from left)
+    let hudSlideRight = 200;  // score circle X offset (slides in from right)
 
     // ── GOALIE SYSTEM ──
     let goalieActive = false;
@@ -1489,30 +1491,34 @@
     const GOALIE_DURATION = 600;  // 10 seconds at 60fps
     let goalieX = GW / 2;
     let goalieY = goal.y + goal.height * 0.5;
-    let goalieState = 'ready';    // 'ready' | 'jumping' | 'blocked' | 'scored'
-    let goalieJumpDir = 0;        // 0=center, 1=left, 2=right, 3=up-left, 4=up-right
+    let goalieState = 'ready';    // 'ready' | 'jumping'
+    let goalieJumpDir = 0;        // 0=idle, 1=left1, 2=left2, 3=right1, 4=right2
     let goalieJumpT = 0;
     let goalieStartX = 0;
     let goalieStartY = 0;
     let goalieTargetX = 0;
     let goalieTargetY = 0;
     let goalieShotsLeft = 3;
+    let goalieFrame = 0;          // sprite frame index (0-4)
 
-    // Goalie sprite (placeholder — will be replaced with sprite sheet)
-    const goalieImg = new Image();
-    goalieImg.src = 'goalie.png';
-    let goalieImgLoaded = false;
-    goalieImg.onload = () => { goalieImgLoaded = true; };
+    // Goalie sprite sheet: 5 frames in a row, 329x256 each
+    const goalieSheet = new Image();
+    goalieSheet.src = 'goalie_sheet.png';
+    let goalieSheetLoaded = false;
+    goalieSheet.onload = () => { goalieSheetLoaded = true; };
+    const GOALIE_CELL_W = 329;
+    const GOALIE_CELL_H = 256;
 
     function activateGoalie() {
       goalieActive = true;
       goalieTimer = GOALIE_DURATION;
       goalieState = 'ready';
+      goalieFrame = 0; // idle
       goalieX = GW / 2;
       goalieY = goal.y + goal.height * 0.5;
       goalieJumpT = 0;
       goalieShotsLeft = 3;
-      // Hide targets during goalie phase
+      targetRespawnTimer = 0;
       for (const t of targets) {
         t.alive = false;
         t.hitAnim = 0;
@@ -1522,39 +1528,36 @@
     function deactivateGoalie() {
       goalieActive = false;
       goalieTimer = 0;
-      // Respawn all targets
       spawnTargets();
     }
 
     function goalieChooseJump() {
-      // Random direction: 0=center, 1=left, 2=right, 3=up-left, 4=up-right
-      goalieJumpDir = Math.floor(Math.random() * 5);
+      // Pick random direction: 1=left1, 2=left2, 3=right1, 4=right2
+      // (no center/idle — goalie always dives)
+      goalieJumpDir = 1 + Math.floor(Math.random() * 4);
+      goalieFrame = goalieJumpDir; // sprite frame matches direction
       goalieState = 'jumping';
       goalieJumpT = 0;
       goalieStartX = GW / 2;
       goalieStartY = goal.y + goal.height * 0.5;
 
-      const jumpDist = 100;
+      const jumpDist = 110;
       switch(goalieJumpDir) {
-        case 0: // center — stays put
-          goalieTargetX = goalieStartX;
+        case 1: // left1
+          goalieTargetX = goalieStartX - jumpDist * 0.7;
+          goalieTargetY = goalieStartY - 20;
+          break;
+        case 2: // left2 (further)
+          goalieTargetX = goalieStartX - jumpDist * 1.2;
           goalieTargetY = goalieStartY - 30;
           break;
-        case 1: // left
-          goalieTargetX = goalieStartX - jumpDist;
-          goalieTargetY = goalieStartY;
-          break;
-        case 2: // right
-          goalieTargetX = goalieStartX + jumpDist;
-          goalieTargetY = goalieStartY;
-          break;
-        case 3: // up-left
-          goalieTargetX = goalieStartX - jumpDist * 0.7;
-          goalieTargetY = goalieStartY - jumpDist * 0.5;
-          break;
-        case 4: // up-right
+        case 3: // right1
           goalieTargetX = goalieStartX + jumpDist * 0.7;
-          goalieTargetY = goalieStartY - jumpDist * 0.5;
+          goalieTargetY = goalieStartY - 20;
+          break;
+        case 4: // right2 (further)
+          goalieTargetX = goalieStartX + jumpDist * 1.2;
+          goalieTargetY = goalieStartY - 30;
           break;
       }
     }
@@ -1569,13 +1572,18 @@
       }
 
       if (goalieState === 'jumping') {
-        goalieJumpT += 0.08;
+        goalieJumpT += 0.06;
         if (goalieJumpT >= 1) {
           goalieJumpT = 1;
-          // Check if goalie blocked the ball
-          goalieState = 'ready';
-          goalieX = GW / 2;
-          goalieY = goal.y + goal.height * 0.5;
+          // Reset to ready after a pause
+          setTimeout(() => {
+            if (goalieActive) {
+              goalieState = 'ready';
+              goalieFrame = 0;
+              goalieX = GW / 2;
+              goalieY = goal.y + goal.height * 0.5;
+            }
+          }, 400);
         } else {
           const eased = 1 - Math.pow(1 - goalieJumpT, 3);
           goalieX = goalieStartX + (goalieTargetX - goalieStartX) * eased;
@@ -1585,42 +1593,27 @@
     }
 
     function drawGoalie() {
-      if (!goalieActive) return;
+      if (!goalieActive || !goalieSheetLoaded) return;
 
-      // Draw goalie as a colored rectangle placeholder until sprite is ready
-      const gw = 60;
-      const gh = 80;
+      const sx = goalieFrame * GOALIE_CELL_W;
+      const drawScale = 0.55; // adjust to fit in goal
+      const drawW = GOALIE_CELL_W * drawScale;
+      const drawH = GOALIE_CELL_H * drawScale;
 
       ctx.save();
-      ctx.fillStyle = '#FF6600';
-      ctx.globalAlpha = 0.8;
-      ctx.fillRect(goalieX - gw/2, goalieY - gh/2, gw, gh);
+      ctx.drawImage(
+        goalieSheet,
+        sx, 0, GOALIE_CELL_W, GOALIE_CELL_H,
+        goalieX - drawW / 2, goalieY - drawH / 2, drawW, drawH
+      );
 
-      // Jersey number
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 24px Impact';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('GK', goalieX, goalieY);
-      ctx.globalAlpha = 1;
-
-      // Timer bar above goal
-      const timerPct = goalieTimer / GOALIE_DURATION;
-      const barW = goal.width * 0.8;
-      const barX = goal.x + (goal.width - barW) / 2;
-      const barY = goal.y - 20;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(barX, barY, barW, 8);
-      ctx.fillStyle = '#FFD700';
-      ctx.fillRect(barX, barY, barW * timerPct, 8);
-
-      // "5X BONUS" text
+      // "5X" text above goalie
       ctx.shadowColor = 'rgba(0,0,0,0.8)';
       ctx.shadowBlur = 6;
       ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 28px Impact';
+      ctx.font = 'bold 24px Impact';
       ctx.textAlign = 'center';
-      ctx.fillText('5X GOALIE', GW / 2, goal.y - 35);
+      ctx.fillText('5X GOALIE', GW / 2, goal.y - 25);
       ctx.shadowBlur = 0;
 
       ctx.restore();
@@ -1628,8 +1621,11 @@
 
     function checkGoalieBlock(ballX, ballY) {
       if (!goalieActive || goalieState !== 'jumping') return false;
-      const dist = distTo(ballX, ballY, goalieX, goalieY);
-      return dist < 60; // goalie block radius
+      // Block if ball overlaps the goalie sprite area
+      const drawScale = 0.55;
+      const gw = GOALIE_CELL_W * drawScale * 0.7;
+      const gh = GOALIE_CELL_H * drawScale * 0.7;
+      return Math.abs(ballX - goalieX) < gw / 2 && Math.abs(ballY - goalieY) < gh / 2;
     }
 
     function startGame() {
@@ -2756,7 +2752,7 @@
 
       // ── TIMER (bottom-left) — no background, just the ring ──
       const ringR = 63;
-      const ringX = 95;
+      const ringX = 95 + hudSlideLeft;
       const ringCY = GH - 180;
       const progress = timeLeft / 60;
 
@@ -2809,14 +2805,14 @@
       }
 
       // ── SCORE (bottom-right) in circle with respawn timer drain ──
-      const scoreX = GW - 95;
+      const scoreX = GW - 95 + hudSlideRight;
       const scoreCY = GH - 180;
       const scoreR = 63;
 
       // Circle color based on multiplier state
       const alive = getAliveCount();
-      const circleColor = alive === 1 ? '#B8860B' : alive === 2 ? '#CC3333' : '#48A943';
-      const circleColorFaded = alive === 1 ? 'rgba(184, 134, 11, 0.2)' : alive === 2 ? 'rgba(204, 51, 51, 0.2)' : 'rgba(72, 169, 67, 0.15)';
+      const circleColor = goalieActive ? '#FFD700' : alive === 1 ? '#B8860B' : alive === 2 ? '#CC3333' : '#48A943';
+      const circleColorFaded = goalieActive ? 'rgba(255, 215, 0, 0.2)' : alive === 1 ? 'rgba(184, 134, 11, 0.2)' : alive === 2 ? 'rgba(204, 51, 51, 0.2)' : 'rgba(72, 169, 67, 0.15)';
 
       // Dark backing circle
       ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -2839,12 +2835,20 @@
 
       // Draining ring — based on respawn timer progress
       // Full when you just hit a target, drains as timer counts toward respawn
-      const respawnProgress = (alive > 0 && alive < 3) ? 1 - (targetRespawnTimer / TARGET_RESPAWN_DELAY) : 1;
+      // Draining ring — respawn timer or goalie timer
+      let ringProgress;
+      if (goalieActive) {
+        ringProgress = goalieTimer / GOALIE_DURATION;
+      } else if (alive > 0 && alive < 3) {
+        ringProgress = 1 - (targetRespawnTimer / TARGET_RESPAWN_DELAY);
+      } else {
+        ringProgress = 1;
+      }
       ctx.strokeStyle = circleColor;
       ctx.lineWidth = 8;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.arc(scoreX, scoreCY, scoreR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, respawnProgress));
+      ctx.arc(scoreX, scoreCY, scoreR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, ringProgress));
       ctx.stroke();
       ctx.lineCap = 'butt';
 
@@ -2860,8 +2864,8 @@
       ctx.restore();
 
       // ── Multiplier text at top of score circle ──
-      if (alive < 3) {
-        const mult = alive === 1 ? '3X' : '2X';
+      if (goalieActive || alive < 3) {
+        const mult = goalieActive ? '5X' : alive === 1 ? '3X' : '2X';
 
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
@@ -2898,21 +2902,21 @@
         introTimer++;
 
         if (introPhase === 'ui') {
-          // Fade in HUD over 30 frames
           introUIAlpha = Math.min(1, introTimer / 30);
           showHUD = true;
-          if (introTimer >= 40) {
-            introPhase = 'targets';
-            introTimer = 0;
+          // Slide HUD circles in from edges
+          hudSlideLeft = -200 * Math.max(0, 1 - introTimer / 25);
+          hudSlideRight = 200 * Math.max(0, 1 - introTimer / 25);
+          // Drop in targets at the same time
+          if (introTimer === 10) {
             showTargets = true;
             spawnTargets();
           }
-        } else if (introPhase === 'targets') {
-          // Targets animate in via their entrance animation
           if (introTimer >= 50) {
             introPhase = 'done';
+            hudSlideLeft = 0;
+            hudSlideRight = 0;
             gameState = 'playing';
-            // Start the game timer
             timerInterval = setInterval(() => {
               timeLeft--;
               if (timeLeft <= 0) {
@@ -3080,6 +3084,27 @@
 
       // Pre-init crowd audio so it's ready to start instantly
       crowdAudio.load();
+      crowdAudio.volume = 0;
+
+      // Start crowd audio near the end of the video for seamless crossfade
+      let crowdStarted = false;
+      introVideo.ontimeupdate = () => {
+        if (!crowdStarted && introVideo.duration && introVideo.currentTime >= introVideo.duration - 0.3) {
+          crowdStarted = true;
+          crowdAudio.currentTime = 0;
+          crowdAudio.volume = 0;
+          crowdAudio.play().catch(() => {});
+          // Quick fade in
+          const fadeIn = setInterval(() => {
+            if (crowdAudio.volume < 0.28) {
+              crowdAudio.volume = Math.min(0.3, crowdAudio.volume + 0.05);
+            } else {
+              crowdAudio.volume = 0.3;
+              clearInterval(fadeIn);
+            }
+          }, 50);
+        }
+      };
 
       introVideo.play().then(() => {
         // Video is playing — NOW hide registration (no black frame)
