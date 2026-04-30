@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.8</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.9</div>
     </div>
   </div>
 
@@ -651,32 +651,27 @@
     });
 
     // ── SOUND EFFECTS ──
-    const kickSFX = new Audio('kick.mp3');
-    kickSFX.volume = 1.0;
-    kickSFX.preload = 'auto';
-
-    const hitSFX = new Audio('targetHit.mp3');
-    hitSFX.volume = 1.0;
-    hitSFX.preload = 'auto';
+    // ── SOUND EFFECTS (inline generated for troubleshooting) ──
+    function createBeep(freq, duration) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'square';
+      gain.gain.value = 0.5;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.stop(ctx.currentTime + duration);
+    }
 
     function playKickSFX() {
-      try {
-        const sfx = kickSFX.cloneNode();
-        sfx.volume = 1.0;
-        sfx.play().catch(e => console.warn('Kick SFX failed:', e));
-      } catch(e) {
-        console.warn('Kick SFX error:', e);
-      }
+      try { createBeep(200, 0.15); } catch(e) { console.warn('Kick beep failed:', e); }
     }
 
     function playHitSFX() {
-      try {
-        const sfx = hitSFX.cloneNode();
-        sfx.volume = 1.0;
-        sfx.play().catch(e => console.warn('Hit SFX failed:', e));
-      } catch(e) {
-        console.warn('Hit SFX error:', e);
-      }
+      try { createBeep(800, 0.2); } catch(e) { console.warn('Hit beep failed:', e); }
     }
 
     // All layers are 1480x2320 → 740x1160 in game coords
