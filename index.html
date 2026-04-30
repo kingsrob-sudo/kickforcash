@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v12.9</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.0</div>
     </div>
   </div>
 
@@ -1454,7 +1454,7 @@
       const horizonY = goal.y + goal.height;
 
       // Total depth the ball must travel (player to extended goal depth)
-      const totalDepth = (ball.homeY - horizonY) + 400;
+      const totalDepth = (ball.homeY - horizonY) + 200; // reduced from 400
 
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
@@ -1467,9 +1467,9 @@
       ball.maxDepth = totalDepth;
       ball.depthSpeed = (1.5 + power * 2.5) * 0.85; // 15% slower for longer flight
 
-      // Arc (vertical) — initial upward velocity, gravity will pull it down
+      // Arc (vertical) — capped so hard kicks don't overshoot as much
       ball.arcY = 0;
-      ball.arcVY = -(8 + power * 4);
+      ball.arcVY = -(8 + power * 2.5); // reduced from power * 4
 
       // State
       ball.flying = true;
