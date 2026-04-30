@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.2</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.3</div>
     </div>
   </div>
 
@@ -651,8 +651,10 @@
     });
 
     // ── SOUND EFFECTS ──
-    // ── SOUND EFFECTS — Web Audio API with persistent context ──
+    // ── SOUND EFFECTS — mp3 files via Web Audio API for reliability ──
     let audioCtx = null;
+    let kickBuffer = null;
+    let hitBuffer = null;
 
     function initAudioCtx() {
       if (!audioCtx) {
@@ -661,30 +663,43 @@
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
-    }
-
-    function createBeep(freq, duration, vol) {
-      if (!audioCtx) return;
-      try {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.frequency.value = freq;
-        osc.type = 'square';
-        gain.gain.value = vol || 0.5;
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-        osc.stop(audioCtx.currentTime + duration);
-      } catch(e) { console.warn('Beep failed:', e); }
+      // Load SFX buffers if not loaded
+      if (!kickBuffer) {
+        fetch('kick.mp3').then(r => r.arrayBuffer()).then(buf => {
+          audioCtx.decodeAudioData(buf, decoded => { kickBuffer = decoded; });
+        }).catch(e => console.warn('kick.mp3 load failed:', e));
+      }
+      if (!hitBuffer) {
+        fetch('targetHit.mp3').then(r => r.arrayBuffer()).then(buf => {
+          audioCtx.decodeAudioData(buf, decoded => { hitBuffer = decoded; });
+        }).catch(e => console.warn('targetHit.mp3 load failed:', e));
+      }
     }
 
     function playKickSFX() {
-      createBeep(200, 0.15, 0.8);
+      if (!audioCtx || !kickBuffer) return;
+      try {
+        const source = audioCtx.createBufferSource();
+        const gain = audioCtx.createGain();
+        source.buffer = kickBuffer;
+        gain.gain.value = 1.0;
+        source.connect(gain);
+        gain.connect(audioCtx.destination);
+        source.start();
+      } catch(e) { console.warn('Kick SFX failed:', e); }
     }
 
     function playHitSFX() {
-      createBeep(800, 0.2, 0.8);
+      if (!audioCtx || !hitBuffer) return;
+      try {
+        const source = audioCtx.createBufferSource();
+        const gain = audioCtx.createGain();
+        source.buffer = hitBuffer;
+        gain.gain.value = 1.0;
+        source.connect(gain);
+        gain.connect(audioCtx.destination);
+        source.start();
+      } catch(e) { console.warn('Hit SFX failed:', e); }
     }
 
     // All layers are 1480x2320 → 740x1160 in game coords
@@ -1477,15 +1492,14 @@
       ball.targetX = clampedX;
       ball.visibleHorizonY = horizonY;
 
-      // Depth (forward travel) — consistent speed, always reaches goal
+      // Depth (forward travel) — fast enough to always reach goal
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = 2.8 * 0.85; // fixed speed, always reaches goal
+      ball.depthSpeed = 4.0; // fixed, guaranteed to reach goal
 
       // Arc (vertical) — power controls height within the goal frame
-      // Low power = hits low in goal, high power = hits high in goal
       ball.arcY = 0;
-      ball.arcVY = -(7 + power * 3); // range: -8.2 to -9.4
+      ball.arcVY = -(6 + power * 5); // range: -8 (low) to -10 (high)
 
       // State
       ball.flying = true;
