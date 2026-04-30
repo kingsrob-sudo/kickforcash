@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.8</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v11.9</div>
     </div>
   </div>
 
@@ -3053,25 +3053,32 @@
         terms_accepted: termsCheck.checked,
       });
 
-      // Hide registration screen
-      document.getElementById('registerScreen').classList.remove('active');
-
-      // Show and play intro video
+      // Prep video — show it but keep registration on top until video is actually playing
       introVideo.style.display = 'block';
       introVideo.currentTime = 0;
-      introVideo.play().catch(e => {
+
+      // Pre-init crowd audio so it's ready to start instantly
+      crowdAudio.load();
+
+      introVideo.play().then(() => {
+        // Video is playing — NOW hide registration (no black frame)
+        document.getElementById('registerScreen').classList.remove('active');
+      }).catch(e => {
         console.log('Intro video play failed:', e);
-        // Fallback: skip video, go straight to game
         introVideo.style.display = 'none';
+        document.getElementById('registerScreen').classList.remove('active');
         startGame();
+        // Start crowd audio as fallback
+        crowdAudio.currentTime = 0;
+        crowdAudio.play().catch(() => {});
       });
 
-      // Start crowd audio (needs user gesture)
-      crowdAudio.play().catch(() => {});
-
-      // When video ends, seamlessly transition to gameplay
+      // When video ends, seamlessly start crowd audio and transition to gameplay
       introVideo.onended = () => {
         introVideo.style.display = 'none';
+        // Start crowd audio immediately — should feel like continuous sound from the video
+        crowdAudio.currentTime = 0;
+        crowdAudio.play().catch(() => {});
         startGame();
       };
     });
@@ -3081,6 +3088,9 @@
     // ============================================================
     document.getElementById('startBtn').addEventListener('click', () => {
       requestGyro();
+      crowdAudio.currentTime = 0;
+      crowdAudio.volume = 0.3;
+      crowdAudio.play().catch(() => {});
       startGame();
     });
     // Ad close — show end screen
