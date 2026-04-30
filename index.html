@@ -501,7 +501,7 @@
       </div>
 
       <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.0</div>
+      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v13.2</div>
     </div>
   </div>
 
@@ -651,27 +651,40 @@
     });
 
     // ── SOUND EFFECTS ──
-    // ── SOUND EFFECTS (inline generated for troubleshooting) ──
-    function createBeep(freq, duration) {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'square';
-      gain.gain.value = 0.5;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      osc.stop(ctx.currentTime + duration);
+    // ── SOUND EFFECTS — Web Audio API with persistent context ──
+    let audioCtx = null;
+
+    function initAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function createBeep(freq, duration, vol) {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'square';
+        gain.gain.value = vol || 0.5;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) { console.warn('Beep failed:', e); }
     }
 
     function playKickSFX() {
-      try { createBeep(200, 0.15); } catch(e) { console.warn('Kick beep failed:', e); }
+      createBeep(200, 0.15, 0.8);
     }
 
     function playHitSFX() {
-      try { createBeep(800, 0.2); } catch(e) { console.warn('Hit beep failed:', e); }
+      createBeep(800, 0.2, 0.8);
     }
 
     // All layers are 1480x2320 → 740x1160 in game coords
@@ -1446,15 +1459,17 @@
         });
       }
 
-      // Power from swipe SPEED (px/sec) — not distance
-      const power = Math.min(Math.max((swipeSpeed - 200) / 2000, 0.1), 1.5);
+      // Power from swipe SPEED — tightly clamped so all kicks reach the goal
+      // Slow swipe = low in goal, fast swipe = high in goal, but nothing undershoots or overshoots
+      const rawPower = Math.max((swipeSpeed - 200) / 2000, 0);
+      const power = 0.4 + Math.min(rawPower, 1.0) * 0.4; // range: 0.4 to 0.8
 
       const aimX = ball.homeX + dx * 3.9;
       const clampedX = Math.max(goal.x + 20, Math.min(goal.x + goal.width - 20, aimX));
       const horizonY = goal.y + goal.height;
 
-      // Total depth the ball must travel (player to extended goal depth)
-      const totalDepth = (ball.homeY - horizonY) + 200; // reduced from 400
+      // Total depth — consistent, every kick reaches the goal
+      const totalDepth = (ball.homeY - horizonY) + 150;
 
       const spinAmount = Math.max(-4, Math.min(4, -spinDeviation * 0.08));
 
@@ -1462,14 +1477,15 @@
       ball.targetX = clampedX;
       ball.visibleHorizonY = horizonY;
 
-      // Depth (forward travel)
+      // Depth (forward travel) — consistent speed, always reaches goal
       ball.depth = 0;
       ball.maxDepth = totalDepth;
-      ball.depthSpeed = (1.5 + power * 2.5) * 0.85; // 15% slower for longer flight
+      ball.depthSpeed = 2.8 * 0.85; // fixed speed, always reaches goal
 
-      // Arc (vertical) — capped so hard kicks don't overshoot as much
+      // Arc (vertical) — power controls height within the goal frame
+      // Low power = hits low in goal, high power = hits high in goal
       ball.arcY = 0;
-      ball.arcVY = -(8 + power * 2.5); // reduced from power * 4
+      ball.arcVY = -(7 + power * 3); // range: -8.2 to -9.4
 
       // State
       ball.flying = true;
@@ -3112,6 +3128,9 @@
       // Request gyro permission (needs user gesture on iOS)
       requestGyro();
 
+      // Init audio context (needs user gesture on mobile)
+      initAudioCtx();
+
       // POST registration to Users sheet
       postToUsers({
         user_id: userId,
@@ -3178,6 +3197,7 @@
     // ============================================================
     document.getElementById('startBtn').addEventListener('click', () => {
       requestGyro();
+      initAudioCtx();
       crowdAudio.currentTime = 0;
       crowdAudio.volume = 0.1;
       crowdAudio.play().catch(() => {});
