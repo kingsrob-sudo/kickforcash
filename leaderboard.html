@@ -48,9 +48,9 @@
   }
 
   .header h2 {
-    font-size: 14px;
+    font-size: 22px;
     font-weight: 700;
-    letter-spacing: 6px;
+    letter-spacing: 12px;
     text-transform: uppercase;
     background: linear-gradient(180deg, #48A943, #2d7a29);
     -webkit-background-clip: text;
@@ -121,7 +121,6 @@
     background: rgba(255,255,255,0.03);
     border-radius: 8px;
     transition: background 0.2s;
-    animation: slideIn 0.4s ease-out both;
   }
 
   .row:hover {
@@ -322,7 +321,7 @@
       const delay = Math.min(i * 0.05, 2);
 
       return `
-        <div class="row ${topClass}" style="animation-delay: ${delay}s">
+        <div class="row ${topClass}">
           <div class="rank">${rankDisplay}</div>
           <div class="player-info">
             <div class="player-name">${getPlayerName(entry)}</div>
