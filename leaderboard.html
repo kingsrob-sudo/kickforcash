@@ -246,7 +246,32 @@
 
 <div class="bg-glow"></div>
 
-<div class="container">
+<!-- START SCREEN -->
+<div id="startScreen" style="position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:10; background:#0a1628;">
+  <img src="KicknCash.png" alt="Kick'n Cash" style="width:280px; height:auto; margin-bottom:40px;">
+  <button id="startBtn" style="
+    font-family:'Oswald',sans-serif;
+    font-size:24px;
+    font-weight:700;
+    letter-spacing:6px;
+    text-transform:uppercase;
+    color:#fff;
+    background:linear-gradient(180deg, #48A943, #2d7a29);
+    border:none;
+    border-radius:12px;
+    padding:18px 60px;
+    cursor:pointer;
+    box-shadow: 0 4px 20px rgba(72,169,67,0.4);
+  ">START</button>
+</div>
+
+<!-- VIDEO PLAYER -->
+<video id="introVideo" playsinline style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:20; display:none; background:#000;">
+  <source src="leaderboardIntro.mp4" type="video/mp4">
+</video>
+
+<!-- LEADERBOARD -->
+<div class="container" id="leaderboardContainer" style="display:none;">
   <div class="header">
     <img src="KicknCash.png" alt="Kick'n Cash">
     <h2>LEADERBOARD</h2>
@@ -366,11 +391,40 @@
     }
   }
 
-  // Initial fetch
-  fetchScores();
+  // Don't fetch until leaderboard is shown
+  // fetchScores();
 
-  // Auto-refresh every 10 seconds
-  setInterval(fetchScores, 10000);
+  // ── START BUTTON → VIDEO → LEADERBOARD ──
+  const startScreen = document.getElementById('startScreen');
+  const introVideo = document.getElementById('introVideo');
+  const leaderboardContainer = document.getElementById('leaderboardContainer');
+
+  document.getElementById('startBtn').addEventListener('click', () => {
+    // Show and play video
+    introVideo.style.display = 'block';
+    introVideo.currentTime = 0;
+
+    introVideo.play().then(() => {
+      // Video playing — hide start screen
+      startScreen.style.display = 'none';
+    }).catch(e => {
+      console.warn('Video play failed:', e);
+      // Skip video, show leaderboard directly
+      startScreen.style.display = 'none';
+      introVideo.style.display = 'none';
+      leaderboardContainer.style.display = 'block';
+      fetchScores();
+      setInterval(fetchScores, 10000);
+    });
+
+    // When video ends, reveal leaderboard
+    introVideo.onended = () => {
+      introVideo.style.display = 'none';
+      leaderboardContainer.style.display = 'block';
+      fetchScores();
+      setInterval(fetchScores, 10000);
+    };
+  });
 </script>
 
 </body>
