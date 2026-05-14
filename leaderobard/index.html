@@ -270,14 +270,6 @@
       <div class="stat-value" id="topScore">—</div>
       <div class="stat-label">Top Score</div>
     </div>
-    <div class="stat">
-      <div class="stat-value" id="avgScore">—</div>
-      <div class="stat-label">Average</div>
-    </div>
-  </div>
-
-  <div class="refresh-info">
-    <span class="dot"></span>LIVE — UPDATES EVERY 30 SECONDS
   </div>
 
   <div class="leaderboard" id="leaderboard">
@@ -292,11 +284,10 @@
   const API_KEY = 'glc-k4c-xR7m2pQ9vL4n';
   const GAMES_URL = 'https://script.google.com/macros/s/AKfycbyA4FfUNgOBKg-nJyRW1RciU1A5QyN7r8dzgeZ-1gq-i2xMijw_W_W_mkP0i2-05KiS3A/exec';
 
-  function maskEmail(email) {
-    if (!email || !email.includes('@')) return 'Anonymous';
-    const [user, domain] = email.split('@');
-    if (user.length <= 2) return user[0] + '***@' + domain;
-    return user[0] + user[1] + '***@' + domain;
+  function getPlayerName(entry) {
+    const id = entry.user_id || '';
+    const tag = id.substring(0, 3).toUpperCase();
+    return 'Player' + (tag || '???');
   }
 
   function formatDate(dateStr) {
@@ -323,11 +314,9 @@
     // Stats
     const totalPlayers = entries.length;
     const topScore = entries[0].score || 0;
-    const avgScore = Math.round(entries.reduce((sum, e) => sum + (e.score || 0), 0) / totalPlayers);
 
     document.getElementById('totalPlayers').textContent = totalPlayers;
     document.getElementById('topScore').textContent = topScore.toLocaleString();
-    document.getElementById('avgScore').textContent = avgScore.toLocaleString();
 
     // Top 50
     const top = entries.slice(0, 50);
@@ -344,7 +333,7 @@
         <div class="row ${topClass}" style="animation-delay: ${delay}s">
           <div class="rank">${rankDisplay}</div>
           <div class="player-info">
-            <div class="player-name">${maskEmail(entry.email)}</div>
+            <div class="player-name">${getPlayerName(entry)}</div>
             <div class="player-date">${formatDate(entry.played_at)}</div>
           </div>
           <div class="score">${(entry.score || 0).toLocaleString()}</div>
