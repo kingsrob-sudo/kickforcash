@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kick'n Cash — Leaderboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Oswald', sans-serif;
+    background: #0a1628;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .bg-glow {
+    position: fixed;
+    top: -30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(72, 169, 67, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    background: linear-gradient(180deg, #FFD700, #FF8C00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+  }
+
+  .header h1 span {
+    display: block;
+    font-size: 14px;
+    letter-spacing: 6px;
+    background: linear-gradient(180deg, #48A943, #2d7a29);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-top: 4px;
+  }
+
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 24px;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #FFD700;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .refresh-info {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 16px;
+    letter-spacing: 1px;
+  }
+
+  .refresh-info .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #48A943;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    transition: background 0.2s;
+    animation: slideIn 0.4s ease-out both;
+  }
+
+  .row:hover {
+    background: rgba(255,255,255,0.06);
+  }
+
+  .row.top-1 {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.12), rgba(255, 140, 0, 0.06));
+    border: 1px solid rgba(255, 215, 0, 0.2);
+  }
+
+  .row.top-2 {
+    background: linear-gradient(135deg, rgba(192, 192, 192, 0.08), rgba(150, 150, 150, 0.04));
+    border: 1px solid rgba(192, 192, 192, 0.15);
+  }
+
+  .row.top-3 {
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.08), rgba(180, 100, 30, 0.04));
+    border: 1px solid rgba(205, 127, 50, 0.15);
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .rank {
+    width: 36px;
+    font-size: 18px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .row.top-1 .rank { color: #FFD700; font-size: 22px; }
+  .row.top-2 .rank { color: #C0C0C0; font-size: 20px; }
+  .row.top-3 .rank { color: #CD7F32; font-size: 20px; }
+
+  .medal {
+    font-size: 20px;
+  }
+
+  .player-info {
+    flex: 1;
+    min-width: 0;
+    margin-left: 12px;
+  }
+
+  .player-name {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.5px;
+  }
+
+  .player-date {
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .score {
+    font-size: 22px;
+    font-weight: 700;
+    color: #48A943;
+    flex-shrink: 0;
+    margin-left: 12px;
+    letter-spacing: 1px;
+  }
+
+  .row.top-1 .score { color: #FFD700; font-size: 26px; }
+
+  .loading {
+    text-align: center;
+    padding: 60px 0;
+    color: rgba(255,255,255,0.4);
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+
+  .loading .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: #48A943;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+  }
+
+  .error button {
+    margin-top: 16px;
+    padding: 10px 24px;
+    background: #48A943;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<div class="container">
+  <div class="header">
+    <h1>
+      KICK'N CASH
+      <span>LEADERBOARD</span>
+    </h1>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-value" id="totalPlayers">—</div>
+      <div class="stat-label">Players</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="topScore">—</div>
+      <div class="stat-label">Top Score</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="avgScore">—</div>
+      <div class="stat-label">Average</div>
+    </div>
+  </div>
+
+  <div class="refresh-info">
+    <span class="dot"></span>LIVE — UPDATES EVERY 30 SECONDS
+  </div>
+
+  <div class="leaderboard" id="leaderboard">
+    <div class="loading">
+      <div class="spinner"></div>
+      LOADING SCORES...
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_KEY = 'glc-k4c-xR7m2pQ9vL4n';
+  const GAMES_URL = 'https://script.google.com/macros/s/AKfycbyA4FfUNgOBKg-nJyRW1RciU1A5QyN7r8dzgeZ-1gq-i2xMijw_W_W_mkP0i2-05KiS3A/exec';
+
+  function maskEmail(email) {
+    if (!email || !email.includes('@')) return 'Anonymous';
+    const [user, domain] = email.split('@');
+    if (user.length <= 2) return user[0] + '***@' + domain;
+    return user[0] + user[1] + '***@' + domain;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch(e) {
+      return '';
+    }
+  }
+
+  function renderLeaderboard(entries) {
+    const board = document.getElementById('leaderboard');
+
+    if (!entries || entries.length === 0) {
+      board.innerHTML = '<div class="error">No scores yet. Be the first to play!<br><button onclick="fetchScores()">REFRESH</button></div>';
+      return;
+    }
+
+    // Sort by score descending
+    entries.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    // Stats
+    const totalPlayers = entries.length;
+    const topScore = entries[0].score || 0;
+    const avgScore = Math.round(entries.reduce((sum, e) => sum + (e.score || 0), 0) / totalPlayers);
+
+    document.getElementById('totalPlayers').textContent = totalPlayers;
+    document.getElementById('topScore').textContent = topScore.toLocaleString();
+    document.getElementById('avgScore').textContent = avgScore.toLocaleString();
+
+    // Top 50
+    const top = entries.slice(0, 50);
+
+    board.innerHTML = top.map((entry, i) => {
+      const rank = i + 1;
+      const topClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
+      const rankDisplay = rank === 1 ? '<span class="medal">🥇</span>' :
+                           rank === 2 ? '<span class="medal">🥈</span>' :
+                           rank === 3 ? '<span class="medal">🥉</span>' : rank;
+      const delay = Math.min(i * 0.05, 2);
+
+      return `
+        <div class="row ${topClass}" style="animation-delay: ${delay}s">
+          <div class="rank">${rankDisplay}</div>
+          <div class="player-info">
+            <div class="player-name">${maskEmail(entry.email)}</div>
+            <div class="player-date">${formatDate(entry.played_at)}</div>
+          </div>
+          <div class="score">${(entry.score || 0).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function fetchScores() {
+    const board = document.getElementById('leaderboard');
+    board.innerHTML = '<div class="loading"><div class="spinner"></div>LOADING SCORES...</div>';
+
+    try {
+      const response = await fetch(GAMES_URL + '?api_key=' + API_KEY + '&action=leaderboard', {
+        method: 'GET',
+      });
+      const data = await response.json();
+
+      if (data && data.entries) {
+        renderLeaderboard(data.entries);
+      } else if (Array.isArray(data)) {
+        renderLeaderboard(data);
+      } else {
+        // Try treating the whole response as entries
+        board.innerHTML = '<div class="error">Could not load scores. Your Apps Script needs a doGet handler.<br><br>See console for details.<br><button onclick="fetchScores()">RETRY</button></div>';
+        console.log('Response from sheet:', data);
+      }
+    } catch(e) {
+      console.error('Fetch error:', e);
+      board.innerHTML = '<div class="error">Could not connect to the leaderboard.<br><button onclick="fetchScores()">RETRY</button></div>';
+    }
+  }
+
+  // Initial fetch
+  fetchScores();
+
+  // Auto-refresh every 30 seconds
+  setInterval(fetchScores, 30000);
+</script>
+
+</body>
+</html>
