@@ -144,6 +144,31 @@
       box-shadow: none;
     }
 
+    .start-btn.shake {
+      animation: btnShake 0.4s ease;
+    }
+
+    @keyframes btnShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-10px); }
+      40% { transform: translateX(10px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+
+    .validation-msg {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #ff6b6b;
+      letter-spacing: 0.5px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .validation-msg.show {
+      opacity: 1;
+    }
+
     .start-hint {
       margin-top: 2rem;
       font-size: 0.85rem;
@@ -500,8 +525,8 @@
         </div>
       </div>
 
-      <button class="start-btn" id="continueBtn">Continue</button>
-      <div style="margin-top: 0.8rem; font-size: 1.5rem; font-weight: 900; color: rgba(255,255,255,0.4); letter-spacing: 1px;">v14.3</div>
+      <button class="start-btn" id="continueBtn" disabled>Continue</button>
+      <div class="validation-msg" id="validationMsg">Please enter your info and agree above</div>
     </div>
   </div>
 
@@ -3189,14 +3214,31 @@
     const marketingCheck = document.getElementById('marketingCheck');
     const continueBtn = document.getElementById('continueBtn');
 
-    // Validation disabled for testing — continue always enabled
-    // TODO: re-enable validation before production
+    // ── FORM VALIDATION ──
+    const validationMsg = document.getElementById('validationMsg');
+
     function validateRegistration() {
-      // const emailValid = emailInput.value.includes('@') && emailInput.value.includes('.');
-      // const phoneValid = phoneInput.value.replace(/\D/g, '').length >= 10;
-      // const allChecked = ageCheck.checked && termsCheck.checked;
-      // continueBtn.disabled = !(emailValid && phoneValid && allChecked);
+      const emailValid = emailInput.value.includes('@') && emailInput.value.includes('.');
+      const phoneValid = phoneInput.value.replace(/\D/g, '').length >= 10;
+      const allChecked = ageCheck.checked && termsCheck.checked && marketingCheck.checked;
+      const valid = emailValid && phoneValid && allChecked;
+      continueBtn.disabled = !valid;
+      if (valid) {
+        validationMsg.classList.remove('show');
+      }
     }
+
+    // Shake + show message when clicking disabled button
+    continueBtn.addEventListener('click', (e) => {
+      if (continueBtn.disabled) {
+        e.stopImmediatePropagation();
+        continueBtn.classList.remove('shake');
+        void continueBtn.offsetWidth; // force reflow
+        continueBtn.classList.add('shake');
+        validationMsg.classList.add('show');
+        return;
+      }
+    });
 
     emailInput.addEventListener('input', validateRegistration);
     phoneInput.addEventListener('input', validateRegistration);
