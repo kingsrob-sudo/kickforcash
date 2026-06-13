@@ -46,8 +46,8 @@
       display: none;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-end;
-      padding-bottom: 3rem;
+      justify-content: center;
+      padding-bottom: 0;
       z-index: 100;
       transition: opacity 0.4s ease;
     }
@@ -566,9 +566,14 @@
 
   <!-- Start Screen (post-registration) -->
   <div id="startScreen">
-    <div class="start-subtitle" style="text-shadow: 0 2px 6px rgba(0,0,0,0.7);">Flick the ball. Hit the targets. Win big.</div>
+    <div style="text-align:center; margin-bottom: 2rem;">
+      <div style="font-family: Impact, 'Arial Black', sans-serif; font-size: 2.2rem; font-weight: 900; color: #fff; text-transform: uppercase; -webkit-text-stroke: 1.5px #000; text-shadow: 0 3px 8px rgba(0,0,0,0.7); line-height: 1.15; letter-spacing: 2px;">
+        Swipe To Kick<br>
+        Hit The Targets<br>
+        Win Big
+      </div>
+    </div>
     <button class="start-btn" id="startBtn">Play</button>
-    <div class="start-hint">Swipe across the ball to shoot</div>
   </div>
 
   <!-- Ad Interstitial (shown before end screen) -->
