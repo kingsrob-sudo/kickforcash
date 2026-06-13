@@ -228,18 +228,20 @@
       position: absolute;
       top: 12px;
       right: 12px;
-      width: 36px;
-      height: 36px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 2px solid rgba(255, 255, 255, 0.4);
+      width: 44px;
+      height: 44px;
+      background: #FF6600;
+      border: 3px solid #fff;
       border-radius: 50%;
       color: #fff;
-      font-size: 18px;
+      font-size: 22px;
+      font-weight: bold;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
 
     .ad-close:active {
@@ -355,10 +357,15 @@
     }
 
     .reg-subtitle {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.85);
+      font-family: Impact, 'Arial Black', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      text-transform: uppercase;
       margin-bottom: 0.8rem;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      -webkit-text-stroke: 1px #000;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+      line-height: 1.15;
     }
 
     .reg-input {
@@ -490,7 +497,7 @@
   <!-- Registration Screen -->
   <div id="registerScreen" class="screen active">
     <div class="reg-content">
-      <div class="reg-subtitle">Enter your info to play and win!</div>
+      <div class="reg-subtitle">Enter Your Info<br>Play & Win!</div>
 
       <input 
         type="email" 
@@ -567,7 +574,9 @@
   <!-- Ad Interstitial (shown before end screen) -->
   <div id="adScreen" class="screen">
     <div class="ad-close" id="adCloseBtn">✕</div>
-    <img src="gameEndAdvert.jpg" alt="Advertisement" class="ad-image">
+    <a href="https://www.galottery.com/en-us/player-zone/where-to-play.html" target="_blank" style="width:100%; height:100%;">
+      <img src="gameEndAdvert.jpg" alt="Advertisement" class="ad-image">
+    </a>
   </div>
 
   <!-- End Screen -->
