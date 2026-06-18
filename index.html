@@ -3368,6 +3368,16 @@
       document.getElementById('startScreen').classList.remove('hidden');
     });
 
+    // Track page view
+    postToUsers({
+      user_id: 'pageview',
+      email: '',
+      phone: '',
+      marketing_consent: false,
+      age_verified: false,
+      terms_accepted: false,
+    });
+
     // Start render loop
     spawnTargets();
     loop();
