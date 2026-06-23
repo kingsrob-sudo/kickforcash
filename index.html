@@ -1891,6 +1891,7 @@
       postToGames({
         user_id: userId,
         email: userEmail,
+        phone: userPhone,
         score: score,
       });
     }
@@ -3195,7 +3196,8 @@
       });
     }
 
-    function postToUsers(data) {
+    function postToUsers(data, retries) {
+      retries = retries || 0;
       data.api_key = 'glc-k4c-xR7m2pQ9vL4n';
       fetch(SHEETS_USERS_URL, {
         method: 'POST',
@@ -3203,7 +3205,12 @@
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(data),
       }).then(() => console.log('Users POST sent'))
-        .catch(err => console.error('Users POST error:', err));
+        .catch(err => {
+          console.error('Users POST error (attempt ' + (retries + 1) + '):', err);
+          if (retries < 2) {
+            setTimeout(() => postToUsers(data, retries + 1), 2000 * (retries + 1));
+          }
+        });
     }
 
     function postToGames(data) {
