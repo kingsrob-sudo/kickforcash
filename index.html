@@ -537,6 +537,18 @@
     </div>
   </div>
 
+  <!-- Challenge Over Popup -->
+  <div id="challengeOverModal" class="modal active">
+    <div class="modal-content" style="text-align: center;">
+      <div class="modal-header" style="font-size: 1.8rem; color: #FFD700;">Thank You For Playing!</div>
+      <div class="modal-body" style="font-size: 1.1rem; line-height: 1.8;">
+        <p>The Kick'n Cash challenge is over.</p>
+        <p>But you can still play for fun!</p>
+      </div>
+      <button class="start-btn" id="challengeAcceptBtn">Accept</button>
+    </div>
+  </div>
+
   <!-- Terms Modal -->
   <div id="termsModal" class="modal">
     <div class="modal-content">
@@ -3383,6 +3395,11 @@
       marketing_consent: false,
       age_verified: false,
       terms_accepted: false,
+    });
+
+    // Challenge over popup
+    document.getElementById('challengeAcceptBtn').addEventListener('click', () => {
+      document.getElementById('challengeOverModal').classList.remove('active');
     });
 
     // Start render loop
